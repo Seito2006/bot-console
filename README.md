@@ -33,12 +33,12 @@ SillyTavern จะดาวน์โหลดและโหลด Extension ใ
 ## Troubleshooting
 
 - **Console button not showing** – the button only appears in chats with the bot named `HI3 Rpg` (change `REQUIRED_NAME` in `profiles.js`, or leave it empty to allow every bot). Alternatively open **Extensions → Seito's bot Console** and turn on *show in every chat*. The panel there also tells you why the button is hidden. *Settings → Reset button* restores its position and size.
-- **Premium key on several devices** – the key is not tied to a device. Devices that share one SillyTavern server and user account pick it up automatically; separate SillyTavern installs each need the key entered once (use *Copy key* in Settings).
+- **Premium key on several devices** – the key is not tied to a device. Devices that share one SillyTavern server and user account pick it up automatically; separate SillyTavern installs each need the key entered once.
 
 ### แก้ปัญหาเบื้องต้น
 
 - **ไม่เห็นปุ่มคอนโซล** – ปุ่มจะแสดงเฉพาะแชทของบอทชื่อ `HI3 Rpg` (แก้ชื่อที่ `REQUIRED_NAME` ใน `profiles.js` หรือเว้นว่างเพื่อให้ทุกบอทใช้ได้) หรือเปิด **Extensions → Seito's bot Console** แล้วเปิดสวิตช์แสดงในทุกแชท ตรงนั้นบอกด้วยว่าปุ่มถูกซ่อนเพราะอะไร ส่วน ตั้งค่า → รีเซ็ตตำแหน่งและขนาดปุ่ม จะดึงปุ่มกลับมาที่เดิม
-- **รหัส Premium หลายเครื่อง** – รหัสไม่ผูกกับเครื่อง เครื่องที่ใช้เซิร์ฟเวอร์และบัญชีผู้ใช้ SillyTavern เดียวกันจะได้รหัสเอง ส่วนเครื่องที่รัน SillyTavern แยกกันต้องใส่รหัสเครื่องละครั้ง (กด คัดลอกรหัส ที่หน้าตั้งค่า)
+- **รหัส Premium หลายเครื่อง** – รหัสไม่ผูกกับเครื่อง เครื่องที่ใช้เซิร์ฟเวอร์และบัญชีผู้ใช้ SillyTavern เดียวกันจะได้รหัสเอง ส่วนเครื่องที่รัน SillyTavern แยกกันต้องใส่รหัสเครื่องละครั้ง
 
 ## License
 

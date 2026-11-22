@@ -9,7 +9,7 @@ import {
 import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
-import { premium, setLicense, licenseKey, licenseReason, clearLicense, maskKey } from './edition.js';
+import { premium, setLicense, licenseKey, licenseReason, clearLicense } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
 import { applyChatUi, watchChat } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
@@ -2057,12 +2057,7 @@ const LIC_MSG = {
 };
 
 function licenseCardHtml() {
-  if (premium()) {
-    return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัส Premium</div><span class="bc-ed">Premium</span></div>
-      <div class="bc-dim">รหัสไม่ผูกกับเครื่อง ใส่ซ้ำบนอีกเครื่องได้เลย · ถ้าเปิดผ่านเซิร์ฟเวอร์ SillyTavern ตัวเดียวกันและบัญชีผู้ใช้เดียวกัน รหัสจะตามกันมาเอง แต่ถ้าแต่ละเครื่องรัน SillyTavern แยกกัน (เช่น มือถือรันในเครื่องตัวเอง) ต้องใส่รหัสในแต่ละเครื่องหนึ่งครั้ง</div>
-      <div class="bc-licrow"><input id="bc-lickey" class="bc-input" type="text" readonly value="${esc(maskKey(licenseKey()))}">
-        <button class="bc-segb" data-act="licCopy"><i class="fa-solid fa-copy"></i>คัดลอกรหัส</button></div></div>`;
-  }
+  if (premium()) return '';
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัสปลดล็อค Premium</div><span class="bc-ed free">Free</span></div>
       <div class="bc-dim">ใส่ Premium license ที่ได้รับ เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ (รหัสขึ้นต้นด้วย BC1.)</div>
       <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="BC1.…">
@@ -2107,27 +2102,6 @@ async function applyLicense() {
     const currentButton = panel?.querySelector('[data-act="licApply"]');
     if (currentButton) currentButton.disabled = false;
   }
-}
-
-async function copyLicense() {
-  const key = licenseKey();
-  if (!key) return;
-  try {
-    await navigator.clipboard.writeText(key);
-    toast('success', 'คัดลอกรหัสแล้ว นำไปวางในอีกเครื่องได้เลย');
-    return;
-  } catch { /* clipboard blocked (plain http / permissions): try the old way */ }
-  const input = $('#bc-lickey');
-  if (!input) return;
-  input.value = key;
-  input.focus();
-  input.select();
-  input.setSelectionRange(0, key.length);
-  let done = false;
-  try { done = document.execCommand('copy'); } catch { }
-  input.value = maskKey(key);
-  if (done) toast('success', 'คัดลอกรหัสแล้ว นำไปวางในอีกเครื่องได้เลย');
-  else toast('warning', 'เบราว์เซอร์นี้ไม่ยอมให้คัดลอกอัตโนมัติ');
 }
 
 // The license lives in SillyTavern's per-user settings on the server. SillyTavern pages keep their own
@@ -2175,7 +2149,7 @@ function skinCardHtml() {
       <div class="bc-wallprev">${wallCustom() || (premium() && cfg.skin !== 'default') ? '' : 'ยังไม่มีวอลเปเปอร์'}</div>
       <div class="bc-seg"><button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallPick"${premium() ? '' : ' disabled'}><i class="fa-solid fa-image"></i>เลือกรูป</button>
         <button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallClear"${premium() ? '' : ' disabled'}><i class="fa-solid fa-rotate-left"></i>ใช้ของสกิน</button></div>
-      ${premium() ? '<div class="bc-locknote">ใช้ร่วมกันทุกเครื่อง · รูปใหญ่จะถูกบีบให้พอดีอัตโนมัติ</div>' : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>
+      ${premium() ? '' : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>
     <div class="bc-card"><div class="bc-h">ความจำสถานะ</div>
       <div class="bc-opt"><div><div class="bc-ot">ตัดแท็กเก่าออกจากสิ่งที่ส่งให้โมเดล</div>
         <div class="bc-dim">เก็บเฉพาะค่าล่าสุดของความสัมพันธ์และเควสต์ ข้อความในแชทไม่ถูกแก้</div></div>
@@ -2412,11 +2386,11 @@ function loadCfg() {
     const raw = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     cfg = { ...CFG_DEFAULT, ...raw };
   } catch { cfg = { ...CFG_DEFAULT }; }
-  cfg.theme = 'dark';
+  cfg.theme = cfg.theme === 'light' ? 'light' : 'dark';
   cfg.lock = cfg.lock !== false;
   cfg.size = clampN(Number(cfg.size) || CFG_DEFAULT.size, 36, 88);
   cfg.transparent = clampN(Number(cfg.transparent) || 0, 0, 70);
-  if (!premium() || !skinById(cfg.skin)) cfg.skin = 'default';
+  if (!skinById(cfg.skin)) cfg.skin = 'default';
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) fabPos = { x: clampN(p.x, 0, 1), y: clampN(p.y, 0, 1) };
@@ -2596,6 +2570,7 @@ function mountUi() {
   let drag = null;
   let dragRaf = 0;
   fab.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
     drag = { px: e.clientX, py: e.clientY, left: fab.offsetLeft, top: fab.offsetTop, nx: fab.offsetLeft, ny: fab.offsetTop, moved: false, threshold: e.pointerType === 'touch' ? 12 : 6, box: fabBox() };
     try { fab.setPointerCapture(e.pointerId); } catch { }
   });
@@ -2636,8 +2611,9 @@ function mountUi() {
       setOpen(!open);
     }
   };
-  fab.addEventListener('pointerup', () => endDrag(false));
-  fab.addEventListener('pointercancel', () => endDrag(true));
+  fab.addEventListener('pointerup', (e) => { e.stopPropagation(); endDrag(false); });
+  fab.addEventListener('pointercancel', (e) => { e.stopPropagation(); endDrag(true); });
+  fab.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
   window.addEventListener('resize', () => { if (notify && !notify.hidden) placeNotify(); });
 
   panel.addEventListener('input', (e) => {
@@ -2697,7 +2673,6 @@ function mountUi() {
         render();
         break;
       case 'licApply': applyLicense(); break;
-      case 'licCopy': copyLicense(); break;
       case 'fabReset':
         fabPos = { x: 1, y: 0.4 };
         cfg.size = CFG_DEFAULT.size;

@@ -19,7 +19,6 @@ function modPow(b, e, m) {
   return r;
 }
 
-// ---- SHA-512 -------------------------------------------------------------
 const K = [
   '428a2f98d728ae22', '7137449123ef65cd', 'b5c0fbcfec4d3b2f', 'e9b5dba58189dbbc', '3956c25bf348b538', '59f111f1b605d019',
   '923f82a4af194f9b', 'ab1c5ed5da6d8118', 'd807aa98a3030242', '12835b0145706fbe', '243185be4ee4b28c', '550c7dc3d5ffb4e2',
@@ -80,7 +79,6 @@ export function sha512(bytes) {
   return out;
 }
 
-// ---- Edwards25519 ----------------------------------------------------------
 const leToBig = (bytes) => { let v = 0n; for (let i = bytes.length - 1; i >= 0; i--) v = (v << 8n) | BigInt(bytes[i]); return v; };
 
 function decodePoint(bytes) {

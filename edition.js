@@ -106,8 +106,3 @@ export function clearLicense() {
   lastReason = '';
 }
 
-export const maskKey = (key) => {
-  if (!key) return '';
-  const [prefix, payload] = String(key).split('.');
-  return payload ? `${prefix}.${payload.slice(0, 8)}…` : `${String(key).slice(0, 7)}…`;
-};
