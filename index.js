@@ -2500,14 +2500,14 @@ function mountUi() {
   let drag = null;
   let dragRaf = 0;
   fab.addEventListener('pointerdown', (e) => {
-    drag = { px: e.clientX, py: e.clientY, left: fab.offsetLeft, top: fab.offsetTop, nx: fab.offsetLeft, ny: fab.offsetTop, moved: false, box: fabBox() };
+    drag = { px: e.clientX, py: e.clientY, left: fab.offsetLeft, top: fab.offsetTop, nx: fab.offsetLeft, ny: fab.offsetTop, moved: false, threshold: e.pointerType === 'touch' ? 12 : 6, box: fabBox() };
     try { fab.setPointerCapture(e.pointerId); } catch { }
   });
   fab.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const dx = e.clientX - drag.px;
     const dy = e.clientY - drag.py;
-    if (!drag.moved && Math.hypot(dx, dy) > 6) { drag.moved = true; fab.classList.add('dragging'); }
+    if (!drag.moved && Math.hypot(dx, dy) > drag.threshold) { drag.moved = true; fab.classList.add('dragging'); }
     if (!drag.moved) return;
     drag.nx = clampN(drag.left + dx, drag.box.xmin, drag.box.xmax);
     drag.ny = clampN(drag.top + dy, drag.box.ymin, drag.box.ymax);
