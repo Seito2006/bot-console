@@ -52,13 +52,30 @@ export const PROFILES = [
   },
 ];
 
-export const REQUIRED_TAG = 'Seito';
+// The console only shows for the bot with this name (case-insensitive). Empty string = no name check.
+export const REQUIRED_NAME = 'HI3 Rpg';
 
+const normName = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+// Name of the open character card, or '' (group chat / nothing open).
+export function botName(ctx) {
+  const ch = ctx.characters?.[ctx.characterId];
+  return String(ch?.name || (ctx.characterId !== undefined ? ctx.name2 : '') || '');
+}
+
+export function hasName(ctx, wanted) {
+  return normName(botName(ctx)) === normName(wanted);
+}
+
+
+// true / false, or null when this SillyTavern build does not expose tags to extensions
+// (then the tag can't be checked, so callers should not hide the console because of it).
 export function hasTag(ctx, tagName) {
+  if (!Array.isArray(ctx.tags) || !ctx.tagMap || typeof ctx.tagMap !== 'object') return null;
   const want = String(tagName || '').trim().toLowerCase();
   const avatar = ctx.characters?.[ctx.characterId]?.avatar;
-  const ids = (avatar && ctx.tagMap?.[avatar]) || [];
-  return ids.some((id) => String(ctx.tags?.find((t) => t.id === id)?.name ?? '').trim().toLowerCase() === want);
+  const ids = (avatar && ctx.tagMap[avatar]) || [];
+  return ids.some((id) => String(ctx.tags.find((t) => t.id === id)?.name ?? '').trim().toLowerCase() === want);
 }
 
 export function matchProfile(ctx) {

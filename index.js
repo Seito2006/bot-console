@@ -1,4 +1,4 @@
-import { PROFILES, pickProfile, REQUIRED_TAG, hasTag } from './profiles.js';
+import { PROFILES, pickProfile, REQUIRED_NAME, hasName } from './profiles.js';
 import { computeState, parseBar, esc } from './core.js';
 import { avatarCandidates, findChar, detectForm, fileUrl } from './avatars.js';
 import {
@@ -9,7 +9,7 @@ import {
 import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
-import { premium, setLicense, licenseKey } from './edition.js';
+import { premium, setLicense, licenseKey, licenseReason, clearLicense, maskKey } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
 import { applyChatUi, watchChat } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
@@ -133,18 +133,35 @@ async function saveNow() {
 const toast = (kind, msg) => { try { toastr[kind](msg); } catch { } };
 const formOpen = () => editing !== null || skillForm !== null || relForm !== null || urlFor !== null || phoneForm || shopForm !== null || missionForm !== null || apptForm !== null || giftFor !== null;
 
+// Why the console is (not) showing in the current chat: 'ok' | 'nochat' | 'name'
+function visibilityState() {
+  if (!hasChat()) return 'nochat';
+  if (REQUIRED_NAME && extSlot().showAll !== true && !hasName(ctx(), REQUIRED_NAME)) return 'name';
+  return 'ok';
+}
+
 function resolveProfile() {
-  if (!hasChat()) return null;
+  if (visibilityState() !== 'ok') return null;
   const c = ctx();
-  if (REQUIRED_TAG && !hasTag(c, REQUIRED_TAG)) return null;
   const saved = c.chatMetadata?.[EXT_ID]?.profileId;
   return PROFILES.find((p) => p.id === saved) || pickProfile(c);
+}
+
+function showVisibilityStatus() {
+  const el = document.getElementById('bcx-vis');
+  if (!el) return;
+  const st = visibilityState();
+  el.className = `bcx-vis ${st === 'ok' ? 'ok' : 'bad'}`;
+  el.textContent = st === 'ok' ? 'ตอนนี้ปุ่มคอนโซลแสดงอยู่ในแชทนี้'
+    : st === 'nochat' ? 'ยังไม่ได้เปิดแชท จึงยังไม่แสดงปุ่มคอนโซล'
+      : `ปุ่มคอนโซลซ่อนอยู่: แชทนี้ไม่ใช่บอทชื่อ “${REQUIRED_NAME}” (เปิดสวิตช์ด้านบนเพื่อแสดงในทุกแชท)`;
 }
 
 function updateVisibility() {
   if (fab) fab.style.display = cur ? '' : 'none';
   if (!cur && open) setOpen(false);
   if (!cur) hideNotify();
+  showVisibilityStatus();
 }
 
 const seenCache = new Map();
@@ -1182,6 +1199,8 @@ function mountApiDrawer(tries = 0) {
   wrap.innerHTML = `<div class="inline-drawer">
     <div class="inline-drawer-toggle inline-drawer-header"><b>Seito's bot Console</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
     <div class="inline-drawer-content">
+      <label class="checkbox_label"><input type="checkbox" id="bcx-all"><span>แสดงปุ่มคอนโซลในทุกแชท (ไม่จำกัดเฉพาะบอทชื่อ ${REQUIRED_NAME})</span></label>
+      <div id="bcx-vis" class="bcx-vis"></div>
       <label class="checkbox_label"><input type="checkbox" id="bcx-on"><span>ใช้ API แยกสำหรับส่วนเสริมนี้ (ข้อความอัตโนมัติ ความคิดในใจ กระดานภารกิจ แชทข้อความ)</span></label>
       <div class="bcx-grid">
         <label class="bcx-l">ผู้ให้บริการ<select class="text_pole" id="bcx-prov">${Object.entries(PROVIDERS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select></label>
@@ -1205,6 +1224,7 @@ function mountApiDrawer(tries = 0) {
       </div>
     </div></div>`;
   host.appendChild(wrap);
+  showVisibilityStatus();
 
   const $d = (id) => wrap.querySelector(`#${id}`);
   const status = (msg, kind = '') => {
@@ -1225,6 +1245,7 @@ function mountApiDrawer(tries = 0) {
     const p = apiP();
     const info = PROVIDERS[a.provider];
     $d('bcx-on').checked = !!a.on;
+    $d('bcx-all').checked = extSlot().showAll === true;
     $d('bcx-prov').value = a.provider;
     $d('bcx-urlrow').style.display = a.provider === 'custom' ? '' : 'none';
     $d('bcx-url').value = p.url || '';
@@ -1243,6 +1264,7 @@ function mountApiDrawer(tries = 0) {
 
   const setters = {
     'bcx-on': (el) => { a.on = el.checked; },
+    'bcx-all': (el) => { extSlot().showAll = el.checked; refresh(); },
     'bcx-url': (el) => { apiP().url = el.value.trim(); },
     'bcx-key': (el) => { apiP().key = el.value.trim(); },
     'bcx-model': (el) => { apiP().model = el.value.trim(); },
@@ -2027,8 +2049,20 @@ const autoCfg = () => ensureAuto(getMeta().phone, (ctx().chat || []).length);
 let licMsg = null;
 let licBusy = false;
 
+const LIC_MSG = {
+  clock: 'นาฬิกาของเครื่องนี้ไม่ตรงกับเวลาจริง (ช้ากว่าเวลาที่ออกรหัสเกิน 5 นาที) ตั้งเวลาเป็นอัตโนมัติแล้วลองใหม่',
+  expired: 'รหัสนี้หมดอายุแล้ว',
+  signature: 'รหัสไม่ถูกต้อง (ลายเซ็นไม่ตรง) ลองคัดลอกใหม่ให้ครบทั้งบรรทัด',
+  format: 'รูปแบบรหัสไม่ถูกต้อง ต้องขึ้นต้นด้วย BC1. และคัดลอกมาให้ครบ',
+};
+
 function licenseCardHtml() {
-  if (premium()) return '';
+  if (premium()) {
+    return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัส Premium</div><span class="bc-ed">Premium</span></div>
+      <div class="bc-dim">รหัสไม่ผูกกับเครื่อง ใส่ซ้ำบนอีกเครื่องได้เลย · ถ้าเปิดผ่านเซิร์ฟเวอร์ SillyTavern ตัวเดียวกันและบัญชีผู้ใช้เดียวกัน รหัสจะตามกันมาเอง แต่ถ้าแต่ละเครื่องรัน SillyTavern แยกกัน (เช่น มือถือรันในเครื่องตัวเอง) ต้องใส่รหัสในแต่ละเครื่องหนึ่งครั้ง</div>
+      <div class="bc-licrow"><input id="bc-lickey" class="bc-input" type="text" readonly value="${esc(maskKey(licenseKey()))}">
+        <button class="bc-segb" data-act="licCopy"><i class="fa-solid fa-copy"></i>คัดลอกรหัส</button></div></div>`;
+  }
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัสปลดล็อค Premium</div><span class="bc-ed free">Free</span></div>
       <div class="bc-dim">ใส่ Premium license ที่ได้รับ เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ (รหัสขึ้นต้นด้วย BC1.)</div>
       <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="BC1.…">
@@ -2051,7 +2085,7 @@ async function applyLicense() {
   if (button) button.disabled = true;
   try {
     if (!await setLicense(raw)) {
-      licMsg = { ok: false, t: 'รหัสไม่ถูกต้อง หมดอายุ หรือไม่ใช่ของ Bot Console' };
+      licMsg = { ok: false, t: LIC_MSG[licenseReason()] || LIC_MSG.format };
       const el = $('#bc-licmsg');
       if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
       return;
@@ -2072,6 +2106,59 @@ async function applyLicense() {
     licBusy = false;
     const currentButton = panel?.querySelector('[data-act="licApply"]');
     if (currentButton) currentButton.disabled = false;
+  }
+}
+
+async function copyLicense() {
+  const key = licenseKey();
+  if (!key) return;
+  try {
+    await navigator.clipboard.writeText(key);
+    toast('success', 'คัดลอกรหัสแล้ว นำไปวางในอีกเครื่องได้เลย');
+    return;
+  } catch { /* clipboard blocked (plain http / permissions): try the old way */ }
+  const input = $('#bc-lickey');
+  if (!input) return;
+  input.value = key;
+  input.focus();
+  input.select();
+  input.setSelectionRange(0, key.length);
+  let done = false;
+  try { done = document.execCommand('copy'); } catch { }
+  input.value = maskKey(key);
+  if (done) toast('success', 'คัดลอกรหัสแล้ว นำไปวางในอีกเครื่องได้เลย');
+  else toast('warning', 'เบราว์เซอร์นี้ไม่ยอมให้คัดลอกอัตโนมัติ');
+}
+
+// The license lives in SillyTavern's per-user settings on the server. SillyTavern pages keep their own
+// in-memory copy and write it all back on every save, so a page that was open before the key was
+// entered elsewhere would later erase it for everybody. Reading the server copy again when the page
+// comes back to the foreground adopts a newer key, and puts ours back if another page wiped it.
+let licSyncAt = 0;
+async function syncLicense() {
+  if (Date.now() - licSyncAt < 60000) return;
+  licSyncAt = Date.now();
+  try {
+    const c = ctx();
+    const headers = c.getRequestHeaders?.();
+    if (!headers) return;
+    const res = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}', cache: 'no-cache' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const saved = typeof data?.settings === 'string' ? JSON.parse(data.settings) : data?.settings;
+    const remote = saved?.extension_settings?.[EXT_ID]?.license;
+    if (premium()) {
+      if (!remote) { extSlot().license = licenseKey(); saveApi(); }
+      return;
+    }
+    if (typeof remote !== 'string' || !remote || !await setLicense(remote)) return;
+    extSlot().license = licenseKey();
+    applyCfg();
+    await initMemory();
+    render();
+    toast('success', 'พบรหัส Premium ที่บันทึกไว้ในเซิร์ฟเวอร์ ปลดล็อคให้แล้ว');
+  } catch (e) {
+    console.warn('[Bot Console] license sync failed', e);
   }
 }
 
@@ -2105,7 +2192,8 @@ function viewSettings() {
       <div class="bc-rng"><div class="bc-line"><span>ขนาด</span><b id="bc-v-size">${cfg.size}px</b></div>
         <input type="range" min="36" max="88" step="2" value="${cfg.size}" data-cfg="size"></div>
       <div class="bc-rng"><div class="bc-line"><span>ความโปร่งใส</span><b id="bc-v-transparent">${cfg.transparent}%</b></div>
-        <input type="range" min="0" max="70" step="5" value="${cfg.transparent}" data-cfg="transparent"></div></div>
+        <input type="range" min="0" max="70" step="5" value="${cfg.transparent}" data-cfg="transparent"></div>
+      <button class="bc-segb" data-act="fabReset"><i class="fa-solid fa-arrows-to-dot"></i>รีเซ็ตตำแหน่งและขนาดปุ่ม</button></div>
     <div class="bc-card"><div class="bc-h">ซิงค์ข้อมูล</div>
       <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>
     <div class="bc-card"><div class="bc-h">ข้อความ</div>
@@ -2268,6 +2356,7 @@ function layoutPanel() {
   if (layoutRaf) return;
   layoutRaf = requestAnimationFrame(() => {
     layoutRaf = 0;
+    escapeBodyContext();
     applyLayout();
     placeFab();
     updateCovered();
@@ -2275,6 +2364,7 @@ function layoutPanel() {
 }
 
 function escapeBodyContext() {
+  if (!panel || !fab || fab.parentNode === document.documentElement) return;
   const cs = getComputedStyle(document.body);
   const odd = (v) => v && v !== 'none' && v !== 'auto' && v !== 'normal';
   if (odd(cs.transform) || odd(cs.filter) || odd(cs.perspective) || /paint|layout|strict|content/.test(cs.contain || '') || odd(cs.backdropFilter)) {
@@ -2494,6 +2584,12 @@ function mountUi() {
   window.addEventListener('resize', layoutPanel);
   window.addEventListener('orientationchange', layoutPanel);
   window.visualViewport?.addEventListener('resize', layoutPanel);
+  window.addEventListener('pageshow', layoutPanel);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    layoutPanel();
+    syncLicense();
+  });
   applyLayout();
   applyCfg();
 
@@ -2601,6 +2697,19 @@ function mountUi() {
         render();
         break;
       case 'licApply': applyLicense(); break;
+      case 'licCopy': copyLicense(); break;
+      case 'fabReset':
+        fabPos = { x: 1, y: 0.4 };
+        cfg.size = CFG_DEFAULT.size;
+        cfg.transparent = 0;
+        saveCfg();
+        savePos();
+        applyCfg();
+        placeFab(true);
+        updateCovered();
+        render();
+        toast('success', 'รีเซ็ตตำแหน่งและขนาดปุ่มแล้ว');
+        break;
       case 'setSkin':
         if (!premium()) break;
         cfg.skin = skinById(t.dataset.v) ? t.dataset.v : 'default';
