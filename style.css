@@ -668,6 +668,8 @@
 #bc-panel .bc-licrow { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
 #bc-panel .bc-licrow .bc-input { letter-spacing: .06em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 #bc-panel .bc-licrow .bc-segb { flex: 0 0 auto; width: auto; padding-left: 14px; padding-right: 14px; white-space: nowrap; }
+#bc-panel .bc-licrow .bc-segb:not(:disabled) { color: var(--bc-on); border-color: transparent; background: linear-gradient(135deg, var(--bc-accent), var(--bc-accent2)); }
+#bc-panel .bc-licrow .bc-segb:disabled { color: var(--bc-dim); border-color: var(--bc-line); background: var(--bc-input); opacity: .55; cursor: not-allowed; }
 #bc-panel .bc-licmsg { min-height: 0; margin-top: 7px; font-size: 12px; line-height: 1.5; }
 #bc-panel .bc-licmsg:empty { display: none; }
 #bc-panel .bc-licmsg.bad { color: #ff7a8a; }

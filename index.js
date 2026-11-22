@@ -2061,7 +2061,7 @@ function licenseCardHtml() {
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัสปลดล็อค Premium</div><span class="bc-ed free">Free</span></div>
       <div class="bc-dim">ใส่ Premium license ที่ได้รับ เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ (รหัสขึ้นต้นด้วย BC1.)</div>
       <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="BC1.…">
-        <button class="bc-segb" data-act="licApply"><i class="fa-solid fa-unlock"></i>ปลดล็อค</button></div>
+        <button class="bc-segb" data-act="licApply" disabled><i class="fa-solid fa-unlock"></i>ปลดล็อค</button></div>
       <div id="bc-licmsg" class="bc-licmsg${licMsg ? (licMsg.ok ? ' ok' : ' bad') : ''}">${licMsg ? esc(licMsg.t) : ''}</div></div>`;
 }
 
@@ -2100,7 +2100,7 @@ async function applyLicense() {
   } finally {
     licBusy = false;
     const currentButton = panel?.querySelector('[data-act="licApply"]');
-    if (currentButton) currentButton.disabled = false;
+    if (currentButton) currentButton.disabled = !String(panel?.querySelector('#bc-lic')?.value || '').trim();
   }
 }
 
@@ -2617,6 +2617,11 @@ function mountUi() {
   window.addEventListener('resize', () => { if (notify && !notify.hidden) placeNotify(); });
 
   panel.addEventListener('input', (e) => {
+    if (e.target?.id === 'bc-lic') {
+      const button = panel.querySelector('[data-act="licApply"]');
+      if (button && !licBusy) button.disabled = !String(e.target.value || '').trim();
+      return;
+    }
     if (e.target?.classList?.contains('bcp-ta')) {
       phoneDraft[e.target.dataset.key] = e.target.value;
       sizeTa(e.target);
