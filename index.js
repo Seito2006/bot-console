@@ -2295,6 +2295,7 @@ function commitEdit() {
 
 let layoutRaf = 0;
 let safeProbe = null;
+let fabDragging = false;
 
 function safeInsets() {
   if (!safeProbe) {
@@ -2332,7 +2333,7 @@ function layoutPanel() {
     layoutRaf = 0;
     escapeBodyContext();
     applyLayout();
-    placeFab();
+    if (!fabDragging) fitFab();
     updateCovered();
   });
 }
@@ -2432,6 +2433,24 @@ function placeFab(animate = false) {
   fab.style.transform = '';
   fab.style.left = `${Math.round(b.xmin + fabPos.x * b.xr)}px`;
   fab.style.top = `${Math.round(b.ymin + fabPos.y * b.yr)}px`;
+}
+
+function fitFab() {
+  if (!fab || getComputedStyle(fab).display === 'none') return;
+  const b = fabBox();
+  const rect = fab.getBoundingClientRect();
+  const x = cfg.lock
+    ? (fabPos.x < 0.5 ? b.xmin : b.xmax)
+    : clampN(rect.left, b.xmin, b.xmax);
+  const y = clampN(rect.top, b.ymin, b.ymax);
+  fab.style.transform = '';
+  fab.style.left = `${Math.round(x)}px`;
+  fab.style.top = `${Math.round(y)}px`;
+  fabPos = {
+    x: b.xr ? clampN((x - b.xmin) / b.xr, 0, 1) : (x <= b.xmin ? 0 : 1),
+    y: b.yr ? clampN((y - b.ymin) / b.yr, 0, 1) : 0,
+  };
+  savePos();
 }
 
 const extSlot = () => {
@@ -2571,6 +2590,7 @@ function mountUi() {
   let dragRaf = 0;
   fab.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
+    fabDragging = true;
     drag = { px: e.clientX, py: e.clientY, left: fab.offsetLeft, top: fab.offsetTop, nx: fab.offsetLeft, ny: fab.offsetTop, moved: false, threshold: e.pointerType === 'touch' ? 12 : 6, box: fabBox() };
     try { fab.setPointerCapture(e.pointerId); } catch { }
   });
@@ -2592,6 +2612,7 @@ function mountUi() {
     if (!drag) return;
     const d = drag;
     drag = null;
+    fabDragging = false;
     cancelAnimationFrame(dragRaf);
     dragRaf = 0;
     fab.classList.remove('dragging');
