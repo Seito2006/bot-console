@@ -1,0 +1,37 @@
+export const SKINS = [
+  { id: 'mei', ui: { ac: '#3350d4', deep: '#14205a', ink: '#141d4d', mu: '#5b69a6' }, title: 'Xentinel', who: 'Raiden Mei', card: 'mei-c.jpg', name: 'Mei · Xentinel', thumb: 'mei-t.jpg', wall: 'mei.jpg',
+    fonts: ['Marcellus', 'Sarabun:wght@400;500;600;700', 'Trirong:wght@400;600'] },
+  { id: 'kiana', ui: { ac: '#c8203f', deep: '#4a0f1c', ink: '#2a1a1e', mu: '#8a6a72' }, title: 'Ba-Dum!', who: 'Kiana', card: 'kiana-c.jpg', name: 'Kiana · Ba-Dum!', thumb: 'kiana-t.jpg', wall: 'kiana.jpg',
+    fonts: ['Kanit:ital,wght@0,400;0,600;1,600;1,700', 'Prompt:wght@400;500;600'] },
+  { id: 'bronya', ui: { ac: '#7442d6', deep: '#2a1650', ink: '#251a3a', mu: '#7a6a9a' }, title: 'Bronya', who: 'Bronya', card: 'bronya-c.jpg', name: 'Bronya · Adult', thumb: 'bronya-t.jpg', wall: 'bronya.jpg',
+    fonts: ['Josefin+Sans:wght@400;600;700', 'Niramit:wght@400;500;600;700'] },
+  { id: 'theresa', ui: { ac: '#b8142f', deep: '#4a0c1a', ink: '#2b141b', mu: '#8f6672' }, title: 'Lunar Vow', who: 'Theresa', card: 'theresa-c.jpg', name: 'Theresa · Lunar Vow', thumb: 'theresa-t.jpg', wall: 'theresa.jpg',
+    fonts: ['Cinzel:wght@500;700', 'Pridi:wght@400;500;600'] },
+  { id: 'fenghuang', ui: { ac: '#e0620a', deep: '#5a2406', ink: '#3a1c0c', mu: '#a2765a' }, title: 'Fenghuang', who: 'Fu Hua', card: 'fenghuang-c.jpg', name: 'Fu Hua · Fenghuang', thumb: 'fenghuang-t.jpg', wall: 'fenghuang.jpg',
+    fonts: ['Playfair+Display:ital,wght@0,600;0,700;1,600;1,700', 'Taviraj:wght@400;500;600', 'Niramit:wght@400;500;600;700'] },
+  { id: 'sentience', ui: { ac: '#a8801f', deep: '#1a2236', ink: '#1a2236', mu: '#6c7896' }, title: 'Sentience', who: 'Fu Hua', card: 'sentience-c.jpg', name: 'Fu Hua · Sentience', thumb: 'sentience-t.jpg', wall: 'sentience.jpg',
+    fonts: ['Oxanium:wght@500;600;700', 'Bai+Jamjuree:wght@400;500;600;700'] },
+];
+
+export const skinById = (id) => SKINS.find((s) => s.id === id) || null;
+
+export function fontHref(id) {
+  const s = skinById(id);
+  if (!s || !s.fonts?.length) return '';
+  return `https://fonts.googleapis.com/css2?${s.fonts.map((f) => `family=${f}`).join('&')}&display=swap`;
+}
+
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(String(h).replace('#', '').slice(i - 1, i + 1), 16));
+const toHex = (a) => `#${a.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+const mixW = (a, t) => a.map((v) => v + (255 - v) * t);
+
+// Colours used to repaint the bot's chat cards (Field HUD, character banner, Valkyrie status) for a skin.
+export function uiPalette(id) {
+  const u = skinById(id)?.ui;
+  if (!u) return null;
+  const ac = hexRgb(u.ac);
+  return {
+    ac: u.ac, ac2: toHex(mixW(ac, 0.4)), t1: toHex(mixW(ac, 0.95)), t2: toHex(mixW(ac, 0.86)), pale: toHex(mixW(ac, 0.9)),
+    deep: u.deep, ink: u.ink, mu: u.mu, rgb: ac.join(','), drgb: hexRgb(u.deep).join(','),
+  };
+}

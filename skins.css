@@ -1,0 +1,364 @@
+#bc-panel[data-skin="mei"],
+#bc-fab[data-skin="mei"],
+#bc-notify[data-skin="mei"],
+#bc-api-drawer[data-skin="mei"] {
+  --bc-font: 'Sarabun', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Marcellus', 'Trirong', serif;
+  --bc-hexp: polygon(50% 0, 96% 14%, 96% 62%, 50% 100%, 4% 62%, 4% 14%); --bc-rp: 18px; --bc-r: 12px; --bc-br: 999px;
+  --bc-btn: none; --bc-chip: inset(0 round 999px);
+}
+#bc-panel[data-skin="mei"],
+#bc-fab[data-skin="mei"],
+#bc-notify[data-skin="mei"],
+#bc-api-drawer[data-skin="mei"] {
+  --bc-bg: rgba(8, 12, 38, 0.97); --bc-bg2: #0c1236; --bc-card: rgba(20, 29, 82, 0.64);
+  --bc-ink: #e9f1ff; --bc-dim: #8fa1d8; --bc-line: rgba(56, 214, 208, 0.3);
+  --bc-accent: #38d6d0; --bc-accent2: #5a6bff; --bc-on: #031a22; --bc-input: #0a1030;
+  --bc-hot: #f1d36a; --bc-hot2: #b79a3a;
+  --bc-head1: #1d2d8a; --bc-head2: #0a1040; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(6, 10, 34, 0.8);
+  --bc-glow: rgba(56, 214, 208, 0.55); --bc-gridc: rgba(56, 214, 208, 0.05); --bc-wash: rgba(90, 107, 255, 0.26);
+  --bc-scan: rgba(56, 214, 208, 0.3); --bc-ghost: rgba(56, 214, 208, 0.13);
+  --bc-up: #4ff0c0; --bc-down: #ff7a9a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(6, 10, 34, 0.8), rgba(6, 10, 34, 0.88));
+}
+
+#bc-panel[data-skin="mei"][data-theme="light"],
+#bc-fab[data-skin="mei"][data-theme="light"],
+#bc-notify[data-skin="mei"][data-theme="light"],
+#bc-api-drawer[data-skin="mei"][data-theme="light"] {
+  --bc-bg: rgba(241, 243, 251, 0.97); --bc-bg2: #e3e8f7; --bc-card: rgba(255, 255, 255, 0.84);
+  --bc-ink: #141d4d; --bc-dim: #5b69a6; --bc-line: rgba(51, 80, 212, 0.34);
+  --bc-accent: #3350d4; --bc-accent2: #22b9c4; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #c9a227; --bc-hot2: #a8841a;
+  --bc-head1: #c3d0f6; --bc-head2: #eef1fc; --bc-head-ink: #14205a;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(51, 80, 212, 0.55); --bc-gridc: rgba(51, 80, 212, 0.07); --bc-wash: rgba(34, 185, 196, 0.3);
+  --bc-scan: rgba(51, 80, 212, 0.3); --bc-ghost: rgba(51, 80, 212, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(241, 243, 251, 0.84), rgba(241, 243, 251, 0.9));
+}
+
+#bc-panel[data-skin="kiana"],
+#bc-fab[data-skin="kiana"],
+#bc-notify[data-skin="kiana"],
+#bc-api-drawer[data-skin="kiana"] {
+  --bc-font: 'Prompt', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Kanit', 'Prompt', sans-serif;
+  --bc-hexp: inset(0 round 34%); --bc-rp: 24px; --bc-r: 16px; --bc-br: 999px;
+  --bc-btn: none; --bc-chip: inset(0 round 999px);
+}
+#bc-panel[data-skin="kiana"],
+#bc-fab[data-skin="kiana"],
+#bc-notify[data-skin="kiana"],
+#bc-api-drawer[data-skin="kiana"] {
+  --bc-bg: rgba(22, 10, 15, 0.97); --bc-bg2: #1f0c14; --bc-card: rgba(52, 19, 31, 0.66);
+  --bc-ink: #fff1f2; --bc-dim: #d19dab; --bc-line: rgba(255, 84, 104, 0.3);
+  --bc-accent: #ff5468; --bc-accent2: #c8203f; --bc-on: #220509; --bc-input: #1b0b11;
+  --bc-hot: #f4c25b; --bc-hot2: #b8862b;
+  --bc-head1: #a3183a; --bc-head2: #3a0b17; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(20, 10, 14, 0.8);
+  --bc-glow: rgba(255, 84, 104, 0.55); --bc-gridc: rgba(255, 84, 104, 0.05); --bc-wash: rgba(200, 32, 63, 0.26);
+  --bc-scan: rgba(255, 84, 104, 0.3); --bc-ghost: rgba(255, 84, 104, 0.13);
+  --bc-up: #5af0b4; --bc-down: #ff8aa0; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(20, 10, 14, 0.8), rgba(20, 10, 14, 0.88));
+}
+
+#bc-panel[data-skin="kiana"][data-theme="light"],
+#bc-fab[data-skin="kiana"][data-theme="light"],
+#bc-notify[data-skin="kiana"][data-theme="light"],
+#bc-api-drawer[data-skin="kiana"][data-theme="light"] {
+  --bc-bg: rgba(247, 242, 243, 0.97); --bc-bg2: #ece6e8; --bc-card: rgba(255, 255, 255, 0.85);
+  --bc-ink: #2a1a1e; --bc-dim: #8a6a72; --bc-line: rgba(200, 32, 63, 0.34);
+  --bc-accent: #c8203f; --bc-accent2: #ef6a7d; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #b8862b; --bc-hot2: #98701f;
+  --bc-head1: #f3c4cc; --bc-head2: #faeef0; --bc-head-ink: #4a0f1c;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(200, 32, 63, 0.55); --bc-gridc: rgba(200, 32, 63, 0.07); --bc-wash: rgba(239, 106, 125, 0.3);
+  --bc-scan: rgba(200, 32, 63, 0.3); --bc-ghost: rgba(200, 32, 63, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(247, 242, 243, 0.84), rgba(247, 242, 243, 0.9));
+}
+
+#bc-panel[data-skin="bronya"],
+#bc-fab[data-skin="bronya"],
+#bc-notify[data-skin="bronya"],
+#bc-api-drawer[data-skin="bronya"] {
+  --bc-font: 'Niramit', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Josefin Sans', 'Niramit', sans-serif;
+  --bc-hexp: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); --bc-rp: 2px; --bc-r: 2px; --bc-br: 0;
+  --bc-btn: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); --bc-chip: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+}
+#bc-panel[data-skin="bronya"],
+#bc-fab[data-skin="bronya"],
+#bc-notify[data-skin="bronya"],
+#bc-api-drawer[data-skin="bronya"] {
+  --bc-bg: rgba(15, 10, 26, 0.97); --bc-bg2: #160e26; --bc-card: rgba(36, 22, 54, 0.66);
+  --bc-ink: #f3ecff; --bc-dim: #ab98cc; --bc-line: rgba(181, 140, 255, 0.3);
+  --bc-accent: #b58cff; --bc-accent2: #7a45f0; --bc-on: #12081f; --bc-input: #130b20;
+  --bc-hot: #ff7ad9; --bc-hot2: #c2379f;
+  --bc-head1: #40257a; --bc-head2: #150c2b; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(14, 9, 25, 0.8);
+  --bc-glow: rgba(181, 140, 255, 0.55); --bc-gridc: rgba(181, 140, 255, 0.05); --bc-wash: rgba(122, 69, 240, 0.26);
+  --bc-scan: rgba(181, 140, 255, 0.3); --bc-ghost: rgba(181, 140, 255, 0.13);
+  --bc-up: #5af0c0; --bc-down: #ff7a9e; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(14, 9, 25, 0.8), rgba(14, 9, 25, 0.88));
+}
+
+#bc-panel[data-skin="bronya"][data-theme="light"],
+#bc-fab[data-skin="bronya"][data-theme="light"],
+#bc-notify[data-skin="bronya"][data-theme="light"],
+#bc-api-drawer[data-skin="bronya"][data-theme="light"] {
+  --bc-bg: rgba(244, 241, 248, 0.97); --bc-bg2: #e8e2f1; --bc-card: rgba(255, 255, 255, 0.85);
+  --bc-ink: #251a3a; --bc-dim: #7a6a9a; --bc-line: rgba(116, 66, 214, 0.34);
+  --bc-accent: #7442d6; --bc-accent2: #b38cf2; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #c2379f; --bc-hot2: #9a2a80;
+  --bc-head1: #d9c9f5; --bc-head2: #f1ebfa; --bc-head-ink: #2a1650;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(116, 66, 214, 0.55); --bc-gridc: rgba(116, 66, 214, 0.07); --bc-wash: rgba(179, 140, 242, 0.3);
+  --bc-scan: rgba(116, 66, 214, 0.3); --bc-ghost: rgba(116, 66, 214, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(244, 241, 248, 0.84), rgba(244, 241, 248, 0.9));
+}
+
+#bc-panel[data-skin="theresa"],
+#bc-fab[data-skin="theresa"],
+#bc-notify[data-skin="theresa"],
+#bc-api-drawer[data-skin="theresa"] {
+  --bc-font: 'Pridi', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Cinzel', 'Pridi', serif;
+  --bc-hexp: circle(50% at 50% 50%); --bc-rp: 38px 38px 8px 8px; --bc-r: 6px; --bc-br: 3px;
+  --bc-btn: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%); --bc-chip: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
+}
+#bc-panel[data-skin="theresa"],
+#bc-fab[data-skin="theresa"],
+#bc-notify[data-skin="theresa"],
+#bc-api-drawer[data-skin="theresa"] {
+  --bc-bg: rgba(18, 6, 10, 0.97); --bc-bg2: #1a080e; --bc-card: rgba(44, 14, 23, 0.68);
+  --bc-ink: #fdeff1; --bc-dim: #cc94a4; --bc-line: rgba(255, 48, 80, 0.3);
+  --bc-accent: #ff3050; --bc-accent2: #a3112b; --bc-on: #18050a; --bc-input: #17080d;
+  --bc-hot: #e6dff2; --bc-hot2: #9c8fb8;
+  --bc-head1: #80133a; --bc-head2: #2a0813; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(16, 5, 10, 0.8);
+  --bc-glow: rgba(255, 48, 80, 0.55); --bc-gridc: rgba(255, 48, 80, 0.05); --bc-wash: rgba(163, 17, 43, 0.26);
+  --bc-scan: rgba(255, 48, 80, 0.3); --bc-ghost: rgba(255, 48, 80, 0.13);
+  --bc-up: #5af0b4; --bc-down: #ff8aa0; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(16, 5, 10, 0.8), rgba(16, 5, 10, 0.88));
+}
+
+#bc-panel[data-skin="theresa"][data-theme="light"],
+#bc-fab[data-skin="theresa"][data-theme="light"],
+#bc-notify[data-skin="theresa"][data-theme="light"],
+#bc-api-drawer[data-skin="theresa"][data-theme="light"] {
+  --bc-bg: rgba(248, 242, 244, 0.97); --bc-bg2: #eee3e7; --bc-card: rgba(255, 255, 255, 0.86);
+  --bc-ink: #2b141b; --bc-dim: #8f6672; --bc-line: rgba(184, 20, 47, 0.34);
+  --bc-accent: #b8142f; --bc-accent2: #e8586f; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #6b5a8a; --bc-hot2: #524470;
+  --bc-head1: #efc3cd; --bc-head2: #faeef1; --bc-head-ink: #4a0c1a;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(184, 20, 47, 0.55); --bc-gridc: rgba(184, 20, 47, 0.07); --bc-wash: rgba(232, 88, 111, 0.3);
+  --bc-scan: rgba(184, 20, 47, 0.3); --bc-ghost: rgba(184, 20, 47, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(248, 242, 244, 0.84), rgba(248, 242, 244, 0.9));
+}
+
+#bc-panel[data-skin="fenghuang"],
+#bc-fab[data-skin="fenghuang"],
+#bc-notify[data-skin="fenghuang"],
+#bc-api-drawer[data-skin="fenghuang"] {
+  --bc-font: 'Niramit', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Playfair Display', 'Taviraj', serif;
+  --bc-hexp: polygon(50% 0, 88% 24%, 100% 58%, 74% 100%, 26% 100%, 0 58%, 12% 24%); --bc-rp: 30px 4px 30px 4px; --bc-r: 18px 3px 18px 3px; --bc-br: 16px 2px 16px 2px;
+  --bc-btn: none; --bc-chip: inset(0 round 9px 1px 9px 1px);
+}
+#bc-panel[data-skin="fenghuang"],
+#bc-fab[data-skin="fenghuang"],
+#bc-notify[data-skin="fenghuang"],
+#bc-api-drawer[data-skin="fenghuang"] {
+  --bc-bg: rgba(13, 15, 32, 0.97); --bc-bg2: #141628; --bc-card: rgba(42, 27, 34, 0.66);
+  --bc-ink: #fff3e4; --bc-dim: #d8ae8e; --bc-line: rgba(255, 154, 48, 0.3);
+  --bc-accent: #ff9a30; --bc-accent2: #ff5a1f; --bc-on: #1d0a02; --bc-input: #11121f;
+  --bc-hot: #ffd36a; --bc-hot2: #c98a12;
+  --bc-head1: #a63a10; --bc-head2: #2a1018; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(11, 12, 28, 0.8);
+  --bc-glow: rgba(255, 154, 48, 0.55); --bc-gridc: rgba(255, 154, 48, 0.05); --bc-wash: rgba(255, 90, 31, 0.26);
+  --bc-scan: rgba(255, 154, 48, 0.3); --bc-ghost: rgba(255, 154, 48, 0.13);
+  --bc-up: #5af0b4; --bc-down: #ff8a8a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(11, 12, 28, 0.8), rgba(11, 12, 28, 0.88));
+}
+
+#bc-panel[data-skin="fenghuang"][data-theme="light"],
+#bc-fab[data-skin="fenghuang"][data-theme="light"],
+#bc-notify[data-skin="fenghuang"][data-theme="light"],
+#bc-api-drawer[data-skin="fenghuang"][data-theme="light"] {
+  --bc-bg: rgba(255, 246, 234, 0.97); --bc-bg2: #fbe9d2; --bc-card: rgba(255, 253, 249, 0.86);
+  --bc-ink: #3a1c0c; --bc-dim: #a2765a; --bc-line: rgba(224, 98, 10, 0.34);
+  --bc-accent: #e0620a; --bc-accent2: #ffae45; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #c98a12; --bc-hot2: #a8710c;
+  --bc-head1: #ffd5a0; --bc-head2: #fff0dc; --bc-head-ink: #5a2406;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(224, 98, 10, 0.55); --bc-gridc: rgba(224, 98, 10, 0.07); --bc-wash: rgba(255, 174, 69, 0.3);
+  --bc-scan: rgba(224, 98, 10, 0.3); --bc-ghost: rgba(224, 98, 10, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(255, 246, 234, 0.84), rgba(255, 246, 234, 0.9));
+}
+
+#bc-panel[data-skin="sentience"],
+#bc-fab[data-skin="sentience"],
+#bc-notify[data-skin="sentience"],
+#bc-api-drawer[data-skin="sentience"] {
+  --bc-font: 'Bai Jamjuree', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Oxanium', 'Bai Jamjuree', sans-serif;
+  --bc-hexp: polygon(28% 0, 72% 0, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0 72%, 0 28%); --bc-rp: 0; --bc-r: 0; --bc-br: 0;
+  --bc-btn: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); --bc-chip: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}
+#bc-panel[data-skin="sentience"],
+#bc-fab[data-skin="sentience"],
+#bc-notify[data-skin="sentience"],
+#bc-api-drawer[data-skin="sentience"] {
+  --bc-bg: rgba(8, 13, 26, 0.97); --bc-bg2: #0d1426; --bc-card: rgba(22, 32, 56, 0.68);
+  --bc-ink: #eaeefa; --bc-dim: #97a3c4; --bc-line: rgba(227, 194, 119, 0.3);
+  --bc-accent: #e3c277; --bc-accent2: #c7364d; --bc-on: #1a1306; --bc-input: #0b1122;
+  --bc-hot: #ff5a72; --bc-hot2: #c7364d;
+  --bc-head1: #202f55; --bc-head2: #0a1020; --bc-head-ink: #ffffff;
+  --bc-shadow: 0 18px 50px rgba(7, 12, 26, 0.8);
+  --bc-glow: rgba(227, 194, 119, 0.55); --bc-gridc: rgba(227, 194, 119, 0.05); --bc-wash: rgba(199, 54, 77, 0.26);
+  --bc-scan: rgba(227, 194, 119, 0.3); --bc-ghost: rgba(227, 194, 119, 0.13);
+  --bc-up: #5af0b4; --bc-down: #ff7a8e; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(7, 12, 26, 0.8), rgba(7, 12, 26, 0.88));
+}
+
+#bc-panel[data-skin="sentience"][data-theme="light"],
+#bc-fab[data-skin="sentience"][data-theme="light"],
+#bc-notify[data-skin="sentience"][data-theme="light"],
+#bc-api-drawer[data-skin="sentience"][data-theme="light"] {
+  --bc-bg: rgba(239, 241, 246, 0.97); --bc-bg2: #e1e5ee; --bc-card: rgba(255, 255, 255, 0.86);
+  --bc-ink: #1a2236; --bc-dim: #6c7896; --bc-line: rgba(168, 128, 31, 0.34);
+  --bc-accent: #a8801f; --bc-accent2: #c0283e; --bc-on: #ffffff; --bc-input: #ffffff;
+  --bc-hot: #c0283e; --bc-hot2: #9a1f31;
+  --bc-head1: #d3d9e9; --bc-head2: #f1f3f8; --bc-head-ink: #1a2236;
+  --bc-shadow: 0 16px 42px rgba(40, 50, 80, .3);
+  --bc-glow: rgba(168, 128, 31, 0.55); --bc-gridc: rgba(168, 128, 31, 0.07); --bc-wash: rgba(192, 40, 62, 0.3);
+  --bc-scan: rgba(168, 128, 31, 0.3); --bc-ghost: rgba(168, 128, 31, 0.12);
+  --bc-up: #12a56d; --bc-down: #d6406a; --bc-knob: #ffffff;
+  --bc-veilx: linear-gradient(rgba(239, 241, 246, 0.84), rgba(239, 241, 246, 0.9));
+}
+
+#bc-panel[data-skin="mei"]::before, #bc-panel[data-skin="mei"]::after,
+#bc-panel[data-skin="kiana"]::before, #bc-panel[data-skin="kiana"]::after,
+#bc-panel[data-skin="theresa"]::before, #bc-panel[data-skin="theresa"]::after,
+#bc-panel[data-skin="fenghuang"]::before, #bc-panel[data-skin="fenghuang"]::after { display: none; }
+#bc-panel[data-skin="mei"] .bc-card::before, #bc-panel[data-skin="mei"] .bc-card::after,
+#bc-panel[data-skin="kiana"] .bc-card::before, #bc-panel[data-skin="kiana"] .bc-card::after,
+#bc-panel[data-skin="theresa"] .bc-card::before, #bc-panel[data-skin="theresa"] .bc-card::after,
+#bc-panel[data-skin="fenghuang"] .bc-card::before, #bc-panel[data-skin="fenghuang"] .bc-card::after { display: none; }
+
+#bc-panel[data-skin="mei"] { box-shadow: var(--bc-shadow), inset 0 0 0 1px rgba(241, 211, 106, .22); }
+#bc-panel[data-skin="mei"] .bc-head::after {
+  right: 48px; width: 110px;
+  background: radial-gradient(circle at 50% 100%, transparent 5px, rgba(241, 211, 106, .3) 5px 6.5px, transparent 6.5px) 0 0 / 13px 8px;
+}
+#bc-panel[data-skin="mei"] .bc-head b, #bc-panel[data-skin="mei"] .bc-name { font-style: normal; font-weight: 400; letter-spacing: .08em; }
+#bc-panel[data-skin="mei"] .bc-head { border-bottom: 1px solid rgba(241, 211, 106, .4); }
+#bc-panel[data-skin="mei"][data-theme="light"] .bc-head { border-bottom-color: rgba(201, 162, 39, .55); }
+#bc-panel[data-skin="mei"] .bc-slash { height: 2px; background: linear-gradient(90deg, var(--bc-hot), transparent); transform: none; }
+
+#bc-panel[data-skin="kiana"] .bc-head::after {
+  background: repeating-linear-gradient(115deg, transparent 0 7px, rgba(244, 194, 91, .3) 7px 9px);
+}
+#bc-panel[data-skin="kiana"] .bc-head { border-bottom: 2px solid var(--bc-hot); }
+#bc-panel[data-skin="kiana"] .bc-sec::before { transform: none; border-radius: 4px; background: var(--bc-hot); box-shadow: 0 0 8px rgba(244, 194, 91, .5); }
+
+#bc-panel[data-skin="bronya"] .bc-head::after {
+  right: 52px; width: 96px;
+  background: repeating-linear-gradient(90deg, transparent 0 5px, rgba(181, 140, 255, .35) 5px 6px, transparent 6px 9px, rgba(255, 122, 217, .3) 9px 11px);
+}
+#bc-panel[data-skin="bronya"] .bc-head b { font-style: normal; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; font-size: 14px; }
+#bc-panel[data-skin="bronya"] .bc-name { font-style: normal; font-weight: 600; letter-spacing: .12em; }
+#bc-panel[data-skin="bronya"] .bc-sec { letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+#bc-panel[data-skin="bronya"] .bc-slash { background: linear-gradient(90deg, var(--bc-accent), var(--bc-hot) 60%, transparent); }
+
+#bc-panel[data-skin="theresa"] .bc-head { justify-content: center; border-bottom: 3px double var(--bc-line); padding-top: 18px; }
+#bc-panel[data-skin="theresa"] .bc-head b { text-align: center; font-style: normal; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; font-size: 14px; }
+#bc-panel[data-skin="theresa"] .bc-head::after { display: none; }
+#bc-panel[data-skin="theresa"] .bc-name { font-style: normal; font-weight: 700; letter-spacing: .1em; }
+#bc-panel[data-skin="theresa"] .bc-card, #bc-panel[data-skin="theresa"] .bc-row,
+#bc-panel[data-skin="theresa"] .bc-tile, #bc-panel[data-skin="theresa"] .bc-skill { border: 3px double var(--bc-line); }
+#bc-panel[data-skin="theresa"] .bc-sec { letter-spacing: .12em; text-transform: uppercase; font-size: 12px; }
+#bc-panel[data-skin="theresa"] .bc-sec::before { transform: rotate(45deg); width: 8px; height: 8px; background: var(--bc-accent); }
+#bc-panel[data-skin="theresa"] .bc-slash { transform: none; height: 2px; width: 60%; background: linear-gradient(90deg, transparent, var(--bc-accent), transparent); }
+
+#bc-panel[data-skin="fenghuang"] .bc-head::after {
+  background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 211, 106, .26) 8px 10px);
+}
+#bc-panel[data-skin="fenghuang"] .bc-head { border-bottom: 2px solid var(--bc-hot); }
+#bc-panel[data-skin="fenghuang"] .bc-sec::before { transform: rotate(35deg); border-radius: 8px 0; box-shadow: 0 0 9px rgba(255, 154, 48, .6); }
+#bc-panel[data-skin="fenghuang"] .bc-slash { background: linear-gradient(90deg, var(--bc-accent2), var(--bc-hot) 55%, transparent); }
+
+#bc-panel[data-skin="sentience"] { clip-path: polygon(0 20px, 20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%); }
+#bc-panel[data-skin="sentience"] .bc-head::after {
+  background: repeating-linear-gradient(115deg, transparent 0 7px, rgba(199, 54, 77, .45) 7px 8px);
+}
+#bc-panel[data-skin="sentience"] .bc-head b, #bc-panel[data-skin="sentience"] .bc-name { letter-spacing: .08em; }
+#bc-panel[data-skin="sentience"] .bc-slash { background: linear-gradient(90deg, var(--bc-accent), var(--bc-accent2) 60%, transparent); }
+#bc-panel[data-skin="sentience"] .bc-hero { border-left: 3px solid var(--bc-accent2); }
+
+#bc-panel[data-skin="mei"] .bc-widget { flex-direction: column; text-align: center; gap: 6px; padding: 16px 14px; background: linear-gradient(180deg, var(--bc-card), transparent); border-color: rgba(241, 211, 106, .35); }
+#bc-panel[data-skin="mei"] .bc-clock { font-style: normal; font-weight: 400; font-size: 46px; letter-spacing: .06em; }
+#bc-panel[data-skin="mei"] .bc-ai { width: 58px; height: 58px; background: linear-gradient(160deg, var(--bc-hot), var(--bc-accent)); color: var(--bc-hot); }
+#bc-panel[data-skin="mei"] .bc-ai::before { content: ''; position: absolute; inset: 2.5px; clip-path: var(--bc-hexp); background: var(--bc-bg2); }
+#bc-panel[data-skin="mei"] .bc-al { letter-spacing: .05em; }
+
+#bc-panel[data-skin="kiana"] .bc-widget { border-radius: 26px; padding: 12px 18px; background: linear-gradient(100deg, var(--bc-head1), var(--bc-head2)); color: var(--bc-head-ink); border: 0; }
+#bc-panel[data-skin="kiana"] .bc-wd span { color: inherit; opacity: .8; }
+#bc-panel[data-skin="kiana"] .bc-apps { gap: 20px 8px; }
+#bc-panel[data-skin="kiana"] .bc-ai { width: 62px; height: 62px; font-size: 23px; color: #fff; background: linear-gradient(160deg, var(--bc-hot), var(--bc-accent) 55%, var(--bc-accent2)); }
+#bc-panel[data-skin="kiana"] .bc-ai::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 46%; background: linear-gradient(rgba(255, 255, 255, .5), rgba(255, 255, 255, 0)); }
+#bc-panel[data-skin="kiana"] .bc-al { font-weight: 600; font-size: 12px; }
+
+#bc-panel[data-skin="bronya"] .bc-status { letter-spacing: .24em; text-transform: uppercase; border-bottom: 1px dashed var(--bc-line); padding-bottom: 6px; }
+#bc-panel[data-skin="bronya"] .bc-clock { font-style: normal; font-weight: 600; letter-spacing: .1em; font-size: 36px; }
+#bc-panel[data-skin="bronya"] .bc-apps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#bc-panel[data-skin="bronya"] .bc-app {
+  flex-direction: row; justify-content: flex-start; gap: 10px; padding: 8px 12px 8px 8px; background: var(--bc-card); border: 1px solid var(--bc-line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+#bc-panel[data-skin="bronya"] .bc-ai { width: 38px; height: 38px; font-size: 15px; }
+#bc-panel[data-skin="bronya"] .bc-al { text-align: left; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; text-shadow: none; }
+#bc-panel[data-skin="bronya"] .bc-app .bc-badge { right: 10px; top: 50%; margin-top: -9px; }
+
+#bc-panel[data-skin="theresa"] .bc-widget {
+  width: 156px; height: 156px; margin: 4px auto 2px; padding: 0; flex-direction: column; justify-content: center; gap: 4px; text-align: center;
+  border-radius: 50%; border: 3px double var(--bc-line); box-shadow: 0 0 34px var(--bc-glow), inset 0 0 22px var(--bc-ghost);
+}
+#bc-panel[data-skin="theresa"] .bc-clock { font-style: normal; font-size: 32px; letter-spacing: .08em; }
+#bc-panel[data-skin="theresa"] .bc-wd b { font-size: 11px; letter-spacing: .1em; }
+#bc-panel[data-skin="theresa"] .bc-wd span { display: none; }
+#bc-panel[data-skin="theresa"] .bc-ai { clip-path: none; border-radius: 50%; width: 56px; height: 56px; border: 3px double var(--bc-accent); background: var(--bc-bg2); color: var(--bc-accent); box-shadow: 0 0 14px var(--bc-glow); }
+#bc-panel[data-skin="theresa"] .bc-al { letter-spacing: .08em; }
+
+#bc-panel[data-skin="fenghuang"] .bc-widget { border-radius: 24px 4px 24px 4px; border-left: 4px solid var(--bc-accent2); background: linear-gradient(100deg, var(--bc-ghost), var(--bc-card)); }
+#bc-panel[data-skin="fenghuang"] .bc-clock { font-weight: 700; font-size: 38px; }
+#bc-panel[data-skin="fenghuang"] .bc-apps { padding-bottom: 24px; }
+#bc-panel[data-skin="fenghuang"] .bc-app:nth-child(even) { transform: translateY(16px); }
+#bc-panel[data-skin="fenghuang"] .bc-app { filter: drop-shadow(0 4px 7px rgba(255, 138, 30, .28)); }
+#bc-panel[data-skin="fenghuang"] .bc-ai { width: 58px; height: 62px; background: linear-gradient(170deg, var(--bc-hot), var(--bc-accent) 50%, var(--bc-accent2)); }
+
+#bc-panel[data-skin="sentience"] .bc-status { letter-spacing: .14em; }
+#bc-panel[data-skin="sentience"] .bc-clock { font-weight: 600; font-size: 32px; letter-spacing: .08em; }
+#bc-panel[data-skin="sentience"] .bc-widget { border-left: 3px solid var(--bc-accent2); }
+#bc-panel[data-skin="sentience"] .bc-apps { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; }
+#bc-panel[data-skin="sentience"] .bc-app {
+  flex-direction: row; justify-content: flex-start; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--bc-line);
+  background: linear-gradient(90deg, var(--bc-ghost), transparent 70%);
+}
+#bc-panel[data-skin="sentience"] .bc-app::after { content: '\25B8'; margin-left: auto; color: var(--bc-accent); font-size: 12px; }
+#bc-panel[data-skin="sentience"] .bc-ai { width: 38px; height: 38px; font-size: 15px; background: var(--bc-line); color: var(--bc-accent); }
+#bc-panel[data-skin="sentience"] .bc-al { flex: 1; text-align: left; font-size: 13px; letter-spacing: .06em; text-shadow: none; }
+#bc-panel[data-skin="sentience"] .bc-app .bc-badge { right: 34px; top: 50%; margin-top: -9px; }
+
+/* Valkyrie Status card (.hs) follows the skin; the element accent (--ac per data-e) is left alone */
+html[data-bc-skin] body .hs {
+  --ink: var(--bcu-ink); --deep: var(--bcu-deep); --mu: var(--bcu-mu); --ln: rgba(var(--bcu-rgb), .3);
+  filter: drop-shadow(0 6px 12px rgba(var(--bcu-rgb), .22));
+}
+html[data-bc-skin] body .hs:has(details[open]) { filter: drop-shadow(0 0 9px var(--ac)) drop-shadow(0 8px 14px rgba(var(--bcu-rgb), .26)); }
+html[data-bc-skin] body .hs .hs-bd { background: linear-gradient(135deg, var(--ac), var(--ac2) 55%, var(--bcu-ac2)); }
+html[data-bc-skin] body .hs .hs-in { background-color: var(--bcu-t1); background-image: radial-gradient(rgba(var(--bcu-rgb), .16) 1px, transparent 1.5px); }
+html[data-bc-skin] body .hs .hs-top { background: linear-gradient(90deg, var(--ac), var(--ac2) 70%, var(--bcu-ac2)); }
+html[data-bc-skin] body .hs .hs-mini { background: rgba(var(--bcu-rgb), .18); }
+html[data-bc-skin] body .hs .hs-bar i { background: rgba(var(--bcu-rgb), .14); }
