@@ -2597,7 +2597,7 @@ function mountUi() {
     drag = {
       px: e.clientX, py: e.clientY,
       left: rect.left, top: rect.top, nx: rect.left, ny: rect.top,
-      box, lockedX: cfg.lock, edgeX: fabPos.x < 0.5 ? box.xmin : box.xmax,
+      box,
       moved: false, threshold: e.pointerType === 'touch' ? 12 : 6,
     };
     try { fab.setPointerCapture(e.pointerId); } catch { }
@@ -2608,7 +2608,7 @@ function mountUi() {
     const dy = e.clientY - drag.py;
     if (!drag.moved && Math.hypot(dx, dy) > drag.threshold) { drag.moved = true; fab.classList.add('dragging'); }
     if (!drag.moved) return;
-    drag.nx = drag.lockedX ? drag.edgeX : clampN(drag.left + dx, drag.box.xmin, drag.box.xmax);
+    drag.nx = clampN(drag.left + dx, drag.box.xmin, drag.box.xmax);
     drag.ny = clampN(drag.top + dy, drag.box.ymin, drag.box.ymax);
     if (dragRaf) return;
     dragRaf = requestAnimationFrame(() => {
@@ -2629,7 +2629,7 @@ function mountUi() {
     fab.classList.remove('dragging');
     if (d.moved) {
       const b = fabBox();
-      const x = d.lockedX ? (fabPos.x < 0.5 ? b.xmin : b.xmax) : clampN(d.nx, b.xmin, b.xmax);
+      const x = clampN(d.nx, b.xmin, b.xmax);
       const y = clampN(d.ny, b.ymin, b.ymax);
       fab.style.left = `${Math.round(x)}px`;
       fab.style.top = `${Math.round(y)}px`;
@@ -2638,6 +2638,7 @@ function mountUi() {
         x: b.xr ? clampN((x - b.xmin) / b.xr, 0, 1) : (x <= b.xmin ? 0 : 1),
         y: b.yr ? clampN((y - b.ymin) / b.yr, 0, 1) : 0,
       };
+      if (cfg.lock) placeFab(true);
       savePos();
       updateCovered();
     } else if (!cancelled) {
