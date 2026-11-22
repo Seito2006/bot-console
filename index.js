@@ -2591,7 +2591,15 @@ function mountUi() {
   fab.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     fabDragging = true;
-    drag = { px: e.clientX, py: e.clientY, left: fab.offsetLeft, top: fab.offsetTop, nx: fab.offsetLeft, ny: fab.offsetTop, moved: false, threshold: e.pointerType === 'touch' ? 12 : 6, box: fabBox() };
+    fab.classList.remove('snap');
+    const rect = fab.getBoundingClientRect();
+    const box = fabBox();
+    drag = {
+      px: e.clientX, py: e.clientY,
+      left: rect.left, top: rect.top, nx: rect.left, ny: rect.top,
+      box, lockedX: cfg.lock, edgeX: fabPos.x < 0.5 ? box.xmin : box.xmax,
+      moved: false, threshold: e.pointerType === 'touch' ? 12 : 6,
+    };
     try { fab.setPointerCapture(e.pointerId); } catch { }
   });
   fab.addEventListener('pointermove', (e) => {
@@ -2600,12 +2608,15 @@ function mountUi() {
     const dy = e.clientY - drag.py;
     if (!drag.moved && Math.hypot(dx, dy) > drag.threshold) { drag.moved = true; fab.classList.add('dragging'); }
     if (!drag.moved) return;
-    drag.nx = clampN(drag.left + dx, drag.box.xmin, drag.box.xmax);
+    drag.nx = drag.lockedX ? drag.edgeX : clampN(drag.left + dx, drag.box.xmin, drag.box.xmax);
     drag.ny = clampN(drag.top + dy, drag.box.ymin, drag.box.ymax);
     if (dragRaf) return;
     dragRaf = requestAnimationFrame(() => {
       dragRaf = 0;
-      if (drag) fab.style.transform = `translate3d(${drag.nx - drag.left}px, ${drag.ny - drag.top}px, 0)`;
+      if (drag) {
+        fab.style.left = `${Math.round(drag.nx)}px`;
+        fab.style.top = `${Math.round(drag.ny)}px`;
+      }
     });
   });
   const endDrag = (cancelled) => {
@@ -2618,14 +2629,15 @@ function mountUi() {
     fab.classList.remove('dragging');
     if (d.moved) {
       const b = fabBox();
-      fab.style.left = `${d.nx}px`;
-      fab.style.top = `${d.ny}px`;
+      const x = d.lockedX ? (fabPos.x < 0.5 ? b.xmin : b.xmax) : clampN(d.nx, b.xmin, b.xmax);
+      const y = clampN(d.ny, b.ymin, b.ymax);
+      fab.style.left = `${Math.round(x)}px`;
+      fab.style.top = `${Math.round(y)}px`;
       fab.style.transform = '';
       fabPos = {
-        x: b.xr ? clampN((d.nx - b.xmin) / b.xr, 0, 1) : 1,
-        y: b.yr ? clampN((d.ny - b.ymin) / b.yr, 0, 1) : 0,
+        x: b.xr ? clampN((x - b.xmin) / b.xr, 0, 1) : (x <= b.xmin ? 0 : 1),
+        y: b.yr ? clampN((y - b.ymin) / b.yr, 0, 1) : 0,
       };
-      placeFab(true);
       savePos();
       updateCovered();
     } else if (!cancelled) {

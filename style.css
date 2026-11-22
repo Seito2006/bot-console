@@ -51,7 +51,7 @@
 }
 #bc-fab:active { transform: scale(.94); }
 #bc-fab.snap { transition: left .22s ease, top .22s ease, filter .15s, transform .12s; }
-#bc-fab.dragging { cursor: grabbing; transition: none; opacity: 1 !important; will-change: transform; }
+#bc-fab.dragging { cursor: grabbing; transform: none !important; transition: none; opacity: 1 !important; will-change: left, top; }
 #bc-fab.active { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .5)); }
 
 #bc-panel {
