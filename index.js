@@ -9,7 +9,7 @@ import {
 import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
-import { premium, setLicense, parseKey } from './edition.js';
+import { premium, setLicense, licenseKey } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
 import { applyChatUi, watchChat } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
@@ -2025,34 +2025,54 @@ function viewUi() {
 const autoCfg = () => ensureAuto(getMeta().phone, (ctx().chat || []).length);
 
 let licMsg = null;
+let licBusy = false;
 
 function licenseCardHtml() {
   if (premium()) return '';
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัสปลดล็อค Premium</div><span class="bc-ed free">Free</span></div>
-      <div class="bc-dim">ใส่รหัสในรูปแบบ BC-XXXX-XXXX-XXXXXX เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ</div>
-      <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="BC-XXXX-XXXX-XXXXXX">
+      <div class="bc-dim">ใส่ Premium license ที่ได้รับ เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ (รหัสขึ้นต้นด้วย BC1.)</div>
+      <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="BC1.…">
         <button class="bc-segb" data-act="licApply"><i class="fa-solid fa-unlock"></i>ปลดล็อค</button></div>
       <div id="bc-licmsg" class="bc-licmsg${licMsg ? (licMsg.ok ? ' ok' : ' bad') : ''}">${licMsg ? esc(licMsg.t) : ''}</div></div>`;
 }
 
-function applyLicense() {
+async function applyLicense() {
+  if (licBusy) return;
   const inp = $('#bc-lic');
   const raw = inp?.value || '';
-  const key = parseKey(raw);
-  if (!key) {
-    licMsg = { ok: false, t: String(raw).trim() ? 'รหัสไม่ถูกต้อง ตรวจตัวอักษรอีกครั้ง (รหัสไม่มีตัว I, O, 0, 1)' : 'ใส่รหัสก่อน' };
+  if (!String(raw).trim()) {
+    licMsg = { ok: false, t: 'ใส่ Premium license ก่อน' };
     const el = $('#bc-licmsg');
     if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
     return;
   }
-  setLicense(key);
-  extSlot().license = key;
-  saveApi();
-  licMsg = null;
-  applyCfg();
-  initMemory();
-  render();
-  toast('success', 'ปลดล็อค Premium แล้ว');
+  licBusy = true;
+  const button = panel?.querySelector('[data-act="licApply"]');
+  if (button) button.disabled = true;
+  try {
+    if (!await setLicense(raw)) {
+      licMsg = { ok: false, t: 'รหัสไม่ถูกต้อง หมดอายุ หรือไม่ใช่ของ Bot Console' };
+      const el = $('#bc-licmsg');
+      if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
+      return;
+    }
+    extSlot().license = licenseKey();
+    saveApi();
+    licMsg = null;
+    applyCfg();
+    await initMemory();
+    render();
+    toast('success', 'ปลดล็อค Premium แล้ว');
+  } catch (e) {
+    console.warn('[Bot Console] license verification failed', e);
+    licMsg = { ok: false, t: 'ตรวจสอบรหัสไม่สำเร็จ กรุณาใช้เบราว์เซอร์เวอร์ชันล่าสุด' };
+    const el = $('#bc-licmsg');
+    if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
+  } finally {
+    licBusy = false;
+    const currentButton = panel?.querySelector('[data-act="licApply"]');
+    if (currentButton) currentButton.disabled = false;
+  }
 }
 
 function skinCardHtml() {
@@ -3039,7 +3059,6 @@ jQuery(() => {
     console.error('[Bot Console] SillyTavern.getContext() not found - SillyTavern is too old.');
     return;
   }
-  try { setLicense(extSlot().license); } catch { }
   mountUi();
   bindEvents();
   refresh();
@@ -3047,4 +3066,10 @@ jQuery(() => {
   applySkin();
   watchChat(applyChatSkin);
   initMemory();
+  void setLicense(extSlot().license).then(async (valid) => {
+    if (!valid) return;
+    applyCfg();
+    await initMemory();
+    render();
+  }).catch((e) => console.warn('[Bot Console] saved license verification failed', e));
 });
