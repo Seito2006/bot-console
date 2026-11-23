@@ -84,7 +84,7 @@ function parseCached(parse, text) {
   return hit;
 }
 
-export function computeState(profile, chat, manual) {
+export function computeState(profile, chat, manual, onReply) {
   const state = structuredClone(profile.defaults || {});
   const edits = [...(manual || [])].sort((a, b) => a.at - b.at);
   let mi = 0;
@@ -95,6 +95,7 @@ export function computeState(profile, chat, manual) {
     for (const parse of profile.parsers) {
       for (const patch of parseCached(parse, m.mes || '')) deepMerge(state, patch);
     }
+    onReply?.(m, state);
   }
   while (mi < edits.length) deepMerge(state, edits[mi++].patch);
   return state;

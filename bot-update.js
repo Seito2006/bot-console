@@ -4,7 +4,8 @@ const editableAvatar = name => safeFilename.test(name) && name.endsWith('.png') 
 const versionParts = version => /^\d+\.\d+\.\d+$/.test(version) ? version.split('.').map(Number) : null;
 const cardName = card => card?.data?.name ?? card?.name;
 
-function installed(card, version) {
+function installed(card, candidate) {
+  const version = candidate.version;
   const raw = card.data?.extensions?.bot_console?.cardVersion ?? card.data?.character_version ?? card.character_version;
   if (raw === version) return true;
   const current = versionParts(raw), incoming = versionParts(version);
@@ -78,10 +79,10 @@ function cardForm(card, current, candidate, picture) {
   }
   form.set('json_data', JSON.stringify({ data }));
   form.set('extensions', JSON.stringify({
-    ...extensions, fav, world: savedExtensions.world || extensions.world || '',
+    ...extensions, fav, world: candidate.lorebook?.slice(0, -5) || savedExtensions.world || extensions.world || '',
     bot_console: { cardVersion: candidate.version },
   }));
-  if (picture) form.set('avatar', picture, candidate.file);
+  if (picture) form.set('avatar', picture, candidate.cover || candidate.file);
   return form;
 }
 
@@ -101,7 +102,7 @@ export function createBotUpdater(context, onChange, generating) {
   const headers = () => context().getRequestHeaders?.();
   const show = () => {
     if (!offer || dialog.open || document.hidden || generating() || document.querySelector('dialog[open]')) return;
-    message.textContent = `${offer.name} (${offer.avatar}) มีการ์ดเวอร์ชัน ${offer.version} พร้อมติดตั้ง ประวัติแชทเดิมจะยังอยู่`;
+    message.textContent = `${offer.name} (${offer.avatar}) มีชุดอัปเดต เวอร์ชัน ${offer.version} พร้อมติดตั้ง ประวัติแชทเดิมจะยังอยู่`;
     dismiss.textContent = 'ไว้ทีหลัง';
     button.hidden = false;
     dialog.showModal();
@@ -119,23 +120,43 @@ export function createBotUpdater(context, onChange, generating) {
     return response.json();
   }
 
+  async function bundledFile(name) {
+    if (typeof name !== 'string' || !/^[^<>:"/\\|?*\x00-\x1f]+\.(?:json|png|jpg|jpeg|webp)$/i.test(name) || name.startsWith('.')) throw new Error('Invalid bundled filename');
+    const response = await fetch(new URL('./bots/' + encodeURIComponent(name), import.meta.url), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error('Bundled file unavailable: ' + name);
+    return response;
+  }
+
+  async function installLorebook(candidate) {
+    if (!candidate.lorebook) return;
+    const file = candidate.lorebook;
+    if (typeof file !== 'string' || !/\.json$/i.test(file)) throw new Error('Invalid Lorebook filename');
+    const data = await (await bundledFile(file)).json();
+    if (!data?.entries || typeof data.entries !== 'object' || !Object.keys(data.entries).length) throw new Error('Invalid Lorebook data');
+    if (generating()) throw new Error('Generation in progress');
+    const response = await fetch('/api/worldinfo/edit', {
+      method: 'POST', headers: headers(), body: JSON.stringify({ name: file.slice(0, -5), data }), signal: AbortSignal.timeout(20000),
+    });
+    if (!response.ok) throw new Error('Lorebook update failed');
+  }
+
   async function check() {
     if (checking || busy || dialog.open || generating()) return;
     checking = true;
     try {
-      configPromise ||= bundledConfig().catch(() => null);
+      configPromise ||= bundledConfig();
       const config = await configPromise;
-      if (!config) return;
+      if (!config) { configPromise = null; return; }
       const c = context();
       const matches = (c.characters || []).filter(card => nameKey(cardName(card)) === nameKey(config.name));
       const selected = matches.length === 1 ? matches[0] : matches.find(card => card.avatar === c.characters[c.characterId]?.avatar);
       const avatar = selected?.avatar;
       let next = null;
-      if (typeof avatar === 'string' && editableAvatar(avatar) && !installed(selected, config.version)) {
+      if (typeof avatar === 'string' && editableAvatar(avatar) && !installed(selected, config)) {
         if (offer?.avatar === avatar) next = offer;
         else {
           const current = await getCard(avatar);
-          if (nameKey(cardName(current)) === nameKey(config.name) && !installed(current, config.version)) next = { ...config, avatar };
+          if (nameKey(cardName(current)) === nameKey(config.name) && !installed(current, config)) next = { ...config, avatar };
         }
       }
       if (offer?.avatar !== next?.avatar) {
@@ -144,6 +165,7 @@ export function createBotUpdater(context, onChange, generating) {
       }
       if (offer && !offered.has(offer.avatar)) show();
     } catch (error) {
+      configPromise = null;
       console.warn('[Bot Console] bot update check failed', error);
     } finally {
       checking = false;
@@ -163,19 +185,22 @@ export function createBotUpdater(context, onChange, generating) {
     try {
       const current = await getCard(candidate.avatar);
       if (current.avatar !== candidate.avatar || nameKey(cardName(current)) !== nameKey(candidate.name)) throw new Error('Character changed');
-      if (!installed(current, candidate.version)) {
+      if (!installed(current, candidate)) {
         const filename = encodeURIComponent(candidate.file);
         const options = { cache: 'no-store', signal: AbortSignal.timeout(15000) };
         let response = await fetch(new URL('./bots/' + filename, import.meta.url), options);
         if (response.status === 404) response = await fetch(new URL('./' + filename, import.meta.url), options);
         if (!response.ok) throw new Error('Bundled character file unavailable');
-        const picture = /\.png$/i.test(candidate.file) ? await response.blob() : null;
-        const card = picture ? pngCard(await picture.arrayBuffer()) : await response.json();
+        const cardImage = /\.png$/i.test(candidate.file) ? await response.blob() : null;
+        const card = cardImage ? pngCard(await cardImage.arrayBuffer()) : await response.json();
         const data = card?.data || card;
         if (nameKey(cardName(card)) !== nameKey(candidate.name) ||
             !['description', 'personality', 'scenario', 'first_mes', 'system_prompt'].some(field => typeof data[field] === 'string' && data[field].trim())) {
           throw new Error('Bundled file does not contain the expected character');
         }
+        const picture = candidate.cover ? await (await bundledFile(candidate.cover)).blob() : cardImage;
+        if (generating()) throw new Error('Generation in progress');
+        await installLorebook(candidate);
         if (generating()) throw new Error('Generation in progress');
         const form = cardForm(card, current, candidate, picture);
         const requestHeaders = new Headers(context().getRequestHeaders?.({ omitContentType: true }));
@@ -183,11 +208,20 @@ export function createBotUpdater(context, onChange, generating) {
         const saved = await fetch('/api/characters/edit', {
           method: 'POST', headers: requestHeaders, body: form, signal: AbortSignal.timeout(45000),
         });
-        if (!saved.ok || !installed(await getCard(candidate.avatar), candidate.version)) throw new Error('Character card was not saved');
+        if (!saved.ok || !installed(await getCard(candidate.avatar), candidate)) throw new Error('Character card was not saved');
       }
       offer = null;
       try { await context().getOneCharacter?.(candidate.avatar); } catch (error) { console.warn('[Bot Console] card refresh failed', error); }
-      message.textContent = `อัปเดต ${candidate.name} เป็นเวอร์ชัน ${candidate.version} แล้ว`;
+      let reloadWorld = false;
+      if (candidate.lorebook) {
+        try {
+          const { worldInfoCache, updateWorldInfoList } = await import('/scripts/world-info.js');
+          if (!worldInfoCache?.delete) throw new Error('World info cache is unavailable');
+          worldInfoCache.delete(candidate.lorebook.slice(0, -5));
+          await updateWorldInfoList?.();
+        } catch { reloadWorld = true; }
+      }
+      message.textContent = `อัปเดต ${candidate.name} เป็นเวอร์ชัน ${candidate.version} แล้ว${candidate.lorebook ? ' พร้อม Lorebook' : ''}${reloadWorld ? ' กรุณาโหลดหน้าใหม่เพื่อใช้ Lorebook ล่าสุด' : ''}`;
       button.hidden = true;
       dismiss.textContent = 'ปิด';
       onChange();

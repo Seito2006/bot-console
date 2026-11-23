@@ -1,1 +1,7 @@
-{}
+{
+  "name": "HI3 Rpg",
+  "version": "2.0.3",
+  "file": "HI3 Rpg.json",
+  "lorebook": "Honkai 3 LB.json",
+  "cover": "HI3 Rpg.png"
+}

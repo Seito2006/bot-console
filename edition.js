@@ -50,9 +50,10 @@ async function signatureValid(kid, message, signature) {
 }
 
 let lastReason = '';
+let activation = null;
 export const licenseReason = () => lastReason;
 
-export async function checkKey(raw) {
+export async function checkKey(raw, { savedActivation = null } = {}) {
   const value = String(raw ?? '').replace(/\s+/g, '');
   if (!value) return { key: '', reason: 'empty' };
   if (value.length > 1024) return { key: '', reason: 'format' };
@@ -67,14 +68,19 @@ export async function checkKey(raw) {
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes));
     if (!payload || payload.v !== 1 || payload.p !== 'bot-console' || !UUID.test(payload.id)) return { key: '', reason: 'format' };
     if (!Number.isSafeInteger(payload.iat) || (payload.exp !== null && !Number.isSafeInteger(payload.exp))) return { key: '', reason: 'format' };
+    const redeem = payload.mode === 'redeem';
+    if (payload.mode !== undefined && (!redeem || !Number.isSafeInteger(payload.exp))) return { key: '', reason: 'format' };
 
     const now = Math.floor(Date.now() / 1000);
     if (payload.iat > now + 300) return { key: '', reason: 'clock' };
-    if (payload.exp !== null && (payload.exp <= now || payload.exp <= payload.iat)) return { key: '', reason: 'expired' };
+    const recorded = savedActivation?.at;
+    const redeemed = redeem && savedActivation?.key === value && Number.isSafeInteger(recorded) &&
+      recorded >= payload.iat - 300 && recorded < payload.exp && recorded <= now + 300;
+    if (payload.exp !== null && (payload.exp <= payload.iat || (payload.exp <= now && !redeemed))) return { key: '', reason: 'expired' };
 
     const message = encoder.encode(`${prefix}.${encodedPayload}`);
     if (!await signatureValid(payload.kid, message, signature)) return { key: '', reason: 'signature' };
-    return { key: `${prefix}.${encodedPayload}.${encodedSignature}`, reason: '' };
+    return { key: value, reason: '', activation: redeem ? { key: value, at: redeemed ? recorded : now } : null };
   } catch {
     return { key: '', reason: 'format' };
   }
@@ -86,16 +92,21 @@ export async function parseKey(raw) {
 
 export const premium = () => !!active;
 export const licenseKey = () => active;
+export const licenseActivation = () => activation;
 
-export async function setLicense(raw, { preserveActive = false } = {}) {
-  const r = await checkKey(raw);
-  if (r.key || !preserveActive) active = r.key;
+export async function setLicense(raw, { preserveActive = false, savedActivation = null } = {}) {
+  const r = await checkKey(raw, { savedActivation });
+  if (r.key || !preserveActive) {
+    active = r.key;
+    activation = r.activation || null;
+  }
   lastReason = r.reason;
   return !!r.key;
 }
 
 export function clearLicense() {
   active = '';
+  activation = null;
   lastReason = '';
 }
 

@@ -5,8 +5,8 @@ const t = (s) => String(s ?? '').trim();
 function normStatus(s) {
   const v = t(s).toLowerCase();
   if (!v) return '';
-  if (/complet|done|clear|finish|success/.test(v)) return 'done';
-  if (/fail/.test(v)) return 'failed';
+  if (/^(?:complet(?:e|ed)|done|clear(?:ed)?|finish(?:ed)?|success|สำเร็จ(?:แล้ว)?|เสร็จสิ้น)$/.test(v)) return 'done';
+  if (/^(?:fail(?:ed|ure)?|ล้มเหลว)$/.test(v)) return 'failed';
   return v;
 }
 
@@ -61,7 +61,8 @@ function char(body) {
 function qlog(body) {
   const [title, rank, st, progress, ...objective] = body.split('|').map(t);
   if (!title) return null;
-  return { mission: { [title]: { title, rank, status: normStatus(st), progress, objective: objective.join('|') } } };
+  const status = normStatus(st);
+  return { mission: { [title]: { title, rank, status, progress, objective: objective.join('|'), ...(status === 'done' ? { completed: true, completionRank: rank, completionProgress: progress } : {}) } } };
 }
 
 function mission(body) {
@@ -70,6 +71,11 @@ function mission(body) {
   const m = { title, rank, objective, progress: `${cur}/${max}`, reward, log: log.join('::') };
   const k = normStatus(kind);
   if (k === 'done' || k === 'failed') m.status = k;
+  if (k === 'done') {
+    m.completed = true;
+    m.completionRank = rank;
+    m.completionProgress = m.progress;
+  }
   return { mission: { [title]: m } };
 }
 

@@ -11,6 +11,25 @@ export const DEFAULT_SHOP = {
     { id: 'teddy', cat: 'ของขวัญ', name: 'ตุ๊กตาหมีตัวเล็ก', bond: 15, price: 200, desc: 'ตุ๊กตานุ่มนิ่มน่ากอด' },
     { id: 'tea-set', cat: 'ของขวัญ', name: 'ชุดน้ำชา', bond: 12, price: 260, desc: 'ชุดน้ำชาสวยๆ สำหรับช่วงเวลาผ่อนคลาย' },
     { id: 'crystal', cat: 'ของใช้', name: 'คริสตัลพลังงาน', price: 500, desc: 'ผลึกพลังงานบริสุทธิ์ ใช้เป็นวัตถุดิบหรือแลกเปลี่ยน' },
+    { id: 'field-bandage', cat: 'เวชภัณฑ์', name: 'ผ้าพันแผลสนาม', hp: 120, price: 35, desc: 'ใช้ทำแผลเบื้องต้น' },
+    { id: 'trauma-kit', cat: 'เวชภัณฑ์', name: 'ชุดปฐมพยาบาลฉุกเฉิน', hp: 600, price: 165, desc: 'ชุดทำแผลและยาฉุกเฉินสำหรับผู้บาดเจ็บหนัก' },
+    { id: 'purifier-dose', cat: 'เวชภัณฑ์', name: 'ยาต้านการกัดกร่อนขนาดพกพา', corr: -80, price: 65, desc: 'ยาขนาดเล็กสำหรับการปนเปื้อนระดับต่ำ' },
+    { id: 'decon-kit', cat: 'เวชภัณฑ์', name: 'ชุดฟื้นฟูหลังสัมผัสฮงไก', hp: 200, corr: -350, price: 310, desc: 'ใช้ฟื้นฟูร่างกายและลดการกัดกร่อนหลังออกจากพื้นที่ปนเปื้อน' },
+    { id: 'signal-flare', cat: 'ใช้ในภารกิจ', name: 'พลุส่งสัญญาณ', price: 55, desc: 'ใช้เรียกกำลังสนับสนุนหรือระบุตำแหน่งจุดนัดพบในฉาก' },
+    { id: 'spare-cell', cat: 'ใช้ในภารกิจ', name: 'แบตเตอรี่สำรอง', price: 75, desc: 'เก็บไว้เปลี่ยนให้วิทยุหรืออุปกรณ์สำรวจในฉาก' },
+    { id: 'field-radio', cat: 'ใช้ในภารกิจ', name: 'วิทยุสื่อสารพกพา', price: 190, desc: 'ใช้ประสานงานกับทีมระหว่างออกสำรวจในโรลเพลย์' },
+    { id: 'honkai-scanner', cat: 'ใช้ในภารกิจ', name: 'เครื่องตรวจวัดฮงไก', price: 380, desc: 'อุปกรณ์สำรวจสำหรับตรวจระดับการปนเปื้อนในฉาก' },
+    { id: 'canteen-water', cat: 'อาหารและเครื่องดื่ม', name: 'น้ำดื่มจากโรงอาหาร', price: 10, desc: 'พกไปดื่มระหว่างเดินทางหรือหลังฝึก' },
+    { id: 'rice-ball', cat: 'อาหารและเครื่องดื่ม', name: 'ข้าวปั้นไส้แซลมอน', price: 25, desc: 'มื้อเบาสำหรับพักระหว่างฉาก' },
+    { id: 'cafeteria-bento', cat: 'อาหารและเครื่องดื่ม', name: 'ข้าวกล่อง St. Freya', price: 60, desc: 'ชุดอาหารโรงเรียนสำหรับพกไปกินนอกสถานที่' },
+    { id: 'milk-tea', cat: 'อาหารและเครื่องดื่ม', name: 'ชานมไข่มุก', price: 45, desc: 'เครื่องดื่มหวานสำหรับแวะซื้อหลังเลิกเรียน' },
+    { id: 'photo-print', cat: 'ของขวัญ', name: 'รูปโพลารอยด์พร้อมกรอบ', bond: 6, price: 55, desc: 'ของขวัญสำหรับเก็บความทรงจำจากฉากที่เล่นด้วยกัน' },
+    { id: 'butterfly-pin', cat: 'ของขวัญ', name: 'เข็มกลัดผีเสื้อ', bond: 13, price: 170, desc: 'เครื่องประดับชิ้นเล็กสำหรับมอบให้ตัวละคร' },
+    { id: 'music-box', cat: 'ของขวัญ', name: 'กล่องดนตรีไขลาน', bond: 20, price: 360, desc: 'ของขวัญสำหรับโอกาสพิเศษ' },
+    { id: 'field-notebook', cat: 'ของใช้', name: 'สมุดบันทึกพกพา', price: 35, desc: 'ใช้จดเบาะแส พิกัด หรือข้อมูลที่เจอในฉาก' },
+    { id: 'pocket-torch', cat: 'ของใช้', name: 'ไฟฉายแบบหนีบ', price: 70, desc: 'หนีบติดกระเป๋าไว้ส่องทางในที่มืดระหว่างโรลเพลย์' },
+    { id: 'alloy-plate', cat: 'วัสดุและอะไหล่', name: 'แผ่นโลหะผสม', price: 110, desc: 'วัสดุสำหรับเล่นฉากซ่อมเกราะหรือประกอบอุปกรณ์' },
+    { id: 'control-chip', cat: 'วัสดุและอะไหล่', name: 'ชิปควบคุมสำรอง', price: 210, desc: 'อะไหล่สำหรับเล่นฉากซ่อมวงจรและเครื่องมือสำรวจ' },
   ],
 };
 
@@ -40,7 +59,57 @@ export function catalog(profile, shop) {
   return [
     ...base.map((i) => ({ ...i, own: false })),
     ...(shop?.custom || []).map((i) => ({ ...i, cat: 'ของที่เพิ่มเอง', own: true })),
+    ...(shop?.story || []).filter(item => ![...base, ...(shop.custom || [])].some(existing => itemKey(existing.name) === itemKey(item.name))),
   ];
+}
+
+const itemKey = name => t(name).normalize('NFKC').replace(/\s+/g, ' ').toLowerCase();
+
+const SHOP_AREAS = [
+  [/ห้องพยาบาล|คลินิก|โรงพยาบาล|infirmary|clinic|hospital|medbay/i, 'ห้องพยาบาล', ['เวชภัณฑ์'], ['hp-potion', 'anti-corr']],
+  [/โรงอาหาร|คาเฟ่|ร้านอาหาร|canteen|cafeteria|caf[eé]|restaurant/i, 'โรงอาหาร', ['อาหารและเครื่องดื่ม'], ['energy-drink', 'cake']],
+  [/ตลาด|ย่านการค้า|ร้านค้า|market|bazaar|shopping district/i, 'ตลาด', ['ของขวัญ', 'อาหารและเครื่องดื่ม', 'ของใช้', 'วัสดุและอะไหล่'], []],
+  [/ไฮเปอเรียน|hyperion|คลังเสบียง|armory|supply depot/i, 'คลังเสบียง', ['ใช้ในภารกิจ', 'เวชภัณฑ์', 'วัสดุและอะไหล่'], ['canteen-water', 'crystal']],
+  [/st\.?\s*freya|เซนต์เฟรยา|เซนต์เฟรย์ย่า|โรงเรียน|academy/i, 'ร้านโรงเรียน', ['อาหารและเครื่องดื่ม', 'ของขวัญ', 'ของใช้'], ['field-bandage', 'energy-drink', 'hp-potion']],
+  [/เขตอพยพ|เขตปนเปื้อน|สนามรบ|ซากเมือง|evacuation|battlefield|contaminated|ruins|nagazora|นางาโซระ/i, 'เสบียงภาคสนาม', ['ใช้ในภารกิจ'], ['field-bandage', 'canteen-water', 'purifier-dose']],
+];
+const GENERAL_SUPPLIES = ['canteen-water', 'rice-ball', 'field-bandage', 'spare-cell', 'pocket-torch'];
+
+export function localShop(items, location) {
+  const [, name, categories, extras] = SHOP_AREAS.find(([pattern]) => pattern.test(location || ''))
+    || [null, 'เสบียงพื้นฐาน', [], GENERAL_SUPPLIES];
+  const place = itemKey(location);
+  return {
+    name,
+    items: items.flatMap(item => {
+      if (item.locations) {
+        const offer = item.locations.get(place);
+        return offer ? [{ ...item, ...offer }] : [];
+      }
+      return item.own || categories.includes(item.cat) || extras.includes(item.id) ? [item] : [];
+    }),
+  };
+}
+
+export function storyStock(locations) {
+  const items = new Map();
+  for (const [message, location] of locations) {
+    for (const block of message.mes.matchAll(/<!--\s*BCSHOP\b([\s\S]*?)-->/g)) {
+      for (const line of block[1].trim().split(/\r?\n/).slice(0, 6)) {
+        const [name, amount, desc] = line.split('|').map(t);
+        const price = Number(amount);
+        if (!name || name.length > 80 || !amount || !/^\d+$/.test(amount) || price < 1 || price > 100000) continue;
+        const key = itemKey(name);
+        if (!items.has(key)) {
+          if (items.size >= 80) continue;
+          items.set(key, { id: 'rp:' + key, name, price, desc: (desc || '').slice(0, 160), cat: 'สินค้าจากโรลเพลย์', locations: new Map() });
+        }
+        const offers = items.get(key).locations;
+        if (!offers.has(itemKey(location))) offers.set(itemKey(location), { price, desc: (desc || '').slice(0, 160) });
+      }
+    }
+  }
+  return [...items.values()];
 }
 
 export const newItemId = () => `c-${uid()}`;
@@ -53,13 +122,14 @@ export function tryBuy(balance, price, qty = 1) {
   return { ok: true, balance: balance - cost, cost };
 }
 
-export function shopContextBlock({ balance, currency, inv, held, names, user }) {
+export function shopContextBlock({ balance, currency, inv, held, names, user, stock = [], storyShop = false }) {
   const cur = currency?.name || 'Coin';
   const list = (items) => Object.entries(items || {})
     .filter(([, q]) => q > 0)
     .map(([id, q]) => `${names[id] || id} x${q}`).join(', ') || 'none';
   const bal = Number.isFinite(balance) ? `${fmtMoney(balance)} ${cur}` : 'unknown';
-  return `[${user}'s wallet: ${bal}. In their bag: ${list(inv)}. Held temporarily outside the bag: ${list(held)}. Use these as the current carried quantities and respect the wallet balance. Items left elsewhere are available when retrieved in the story. If the story spends or earns money, add one hidden line at the end of the reply: <!--BC\nplayer.money: <new total number>\n-->]`;
+  const shop = storyShop ? ` When a merchant actually lists NEW goods for sale in the roleplay, append one hidden HTML comment in this format: <!--BCSHOP\nitem name | price as a positive integer in ${cur} | short description\n-->. Record up to six items in the story language and keep the HI3_HUD location consistent for the same shop. On arrival at a new shop, set the HUD location to that shop or area in the same reply. Omit goods already listed here (${stock.slice(-22).map(item => item.name).join(', ')}), freebies, wishes, and goods that are merely seen. Listing stock does not buy or award it.` : '';
+  return `[${user}'s wallet: ${bal}. In their bag: ${list(inv)}. Held temporarily outside the bag: ${list(held)}. Use these as the current carried quantities and respect the wallet balance. Items left elsewhere are available when retrieved in the story. If the story spends or earns money, add one hidden line at the end of the reply: <!--BC\nplayer.money: <new total number>\n-->${shop}]`;
 }
 
 export function rewardAmount(text, currencyName = 'Coin') {

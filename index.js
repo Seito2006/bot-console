@@ -10,11 +10,11 @@ import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
 import { readTurns, syncTurnTexts, turnPrompt } from './roleplay.js';
-import { premium, setLicense, licenseKey, licenseReason } from './edition.js';
+import { premium, setLicense, licenseKey, licenseReason, licenseActivation } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
 import { themeRegex, themeVisibleCards } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
-import { DEFAULT_SHOP, rewardAmount, toMoney, fmtMoney, ensureShop, catalog, newItemId, tryBuy, shopContextBlock } from './shop.js';
+import { DEFAULT_SHOP, rewardAmount, toMoney, fmtMoney, ensureShop, catalog, localShop, newItemId, tryBuy, shopContextBlock, storyStock } from './shop.js';
 
 import { createSyncedDoc, emptyPrefs, mergePrefs, prefValue, setPref, uploadFile, deleteFile, serverFileUrl, accountHandle } from './sync.js';
 import { createProgressStore, grantActivity, accountLevel, missionExp, XP_PER_LEVEL, POINTS_PER_LEVEL } from './progress.js';
@@ -78,6 +78,7 @@ let notifyTimer = null;
 let notifyName = null;
 let notifyCount = 0;
 let shopForm = null;
+let shopCategory = '';
 let autoBusy = false;
 let autoTimer = null;
 const sceneForce = new Map();
@@ -202,12 +203,16 @@ function rebuild() {
     return;
   }
   const meta = getMeta();
-  cur = { profile, state: computeState(profile, ctx().chat || [], meta.manual) };
+  const chat = ctx().chat || [];
+  const listingLocations = [];
+  const state = computeState(profile, chat, meta.manual, profile.id === 'hi3' ? (message, turn) => {
+    if (message.mes?.includes('BCSHOP')) listingLocations.push([message, turn.player?.location]);
+  } : undefined);
+  cur = { profile, state, stock: storyStock(listingLocations) };
   mergeCustomRel(cur.state, meta);
   mergeCustomMission(cur.state, meta);
   awardActivity();
-  const chat = ctx().chat || [];
-  cur.bag = readTurns(chat, meta.shop, catalog(profile, meta.shop));
+  cur.bag = readTurns(chat, meta.shop, shopCatalog(profile, meta.shop));
   if (giftFor && !(cur.bag.inv[giftFor] > 0)) giftFor = null;
   const contacts = [...Object.values(meta.phone.threads).map(th => th.name), ...Object.keys(cur.state.rel || {})];
   const changed = syncTurnTexts(meta.phone, cur.bag.messages, {
@@ -446,8 +451,8 @@ function applyShopCtx(off = false) {
       const chat = c.chat || [];
       const input = replacedReply && chat.at(-1) === replacedReply ? chat.slice(0, -1) : chat;
       const bag = input !== chat || input.at(-1)?.extra?.bcBagTurn
-        ? readTurns(input, sh, catalog(cur.profile, sh), { beforeReply: true }) : cur.bag;
-      text = shopContextBlock({ balance: balanceOf(), currency: shopCfg().currency, ...bag, user: userName() });
+        ? readTurns(input, sh, shopCatalog(cur.profile, sh), { beforeReply: true }) : cur.bag;
+      text = shopContextBlock({ balance: balanceOf(), currency: shopCfg().currency, ...bag, user: userName(), stock: shopShelf(sh).items, storyShop: cur.profile.id === 'hi3' });
     }
   }
   try {
@@ -984,6 +989,11 @@ function syncAutoUi() {
   b.querySelector('span').textContent = autoBusy ? 'กำลังคิด…' : 'ลองให้ตัดสินใจตอนนี้';
 }
 
+const shopCatalog = (profile, shop) => catalog(profile, { ...shop, story: cur?.stock });
+function shopShelf(shop) {
+  const items = shopCatalog(cur.profile, shop);
+  return cur.profile.id === 'hi3' ? localShop(items, cur.state.player?.location) : { name: '', items };
+}
 const shopCfg = () => cur?.profile?.shop || DEFAULT_SHOP;
 
 function balanceOf() {
@@ -1013,7 +1023,7 @@ function adjustBag(meta, item, delta) {
 function buyItem(id) {
   const meta = getMeta();
   if (!meta || !cur) return;
-  const item = catalog(cur.profile, meta.shop).find((i) => i.id === id);
+  const item = shopShelf(meta.shop).items.find((i) => i.id === id);
   if (!item) return;
   const r = tryBuy(balanceOf(), Number(item.price) || 0, 1);
   const cu = shopCfg().currency?.name || 'Coin';
@@ -1033,7 +1043,14 @@ function buyItem(id) {
 
 function itemById(id) {
   const meta = getMeta();
-  return catalog(cur.profile, meta.shop).find((i) => i.id === id) || { id, name: cur.bag.names[id] || id, price: 0 };
+  return shopCatalog(cur.profile, meta.shop).find((i) => i.id === id) || { id, name: cur.bag.names[id] || id, price: 0 };
+}
+
+function itemEffectChips(item) {
+  return [['hp', 'HP'], ['corr', 'Corruption'], ['bond', 'Bond']]
+    .filter(([key]) => item[key])
+    .map(([key, label]) => `<span class="bc-chip">${label} ${item[key] > 0 ? '+' : ''}${esc(item[key])}</span>`)
+    .join('');
 }
 
 function useItem(id) {
@@ -1091,10 +1108,7 @@ function viewBag() {
   const relNames = Object.keys(cur.state.rel || {});
   const bagRow = (id) => {
     const it = itemById(id);
-    const fx = [it?.hp ? `HP ${it.hp > 0 ? '+' : ''}${it.hp}` : '', it?.corr ? `Corruption ${it.corr > 0 ? '+' : ''}${it.corr}` : '']
-      .filter(Boolean)
-      .map((x) => `<span class="bc-chip">${x}</span>`)
-      .join('');
+    const fx = itemEffectChips(it);
     const gain = giftBond(it);
     const picker =
       giftFor === id
@@ -1121,7 +1135,8 @@ function viewShop() {
   const conf = shopCfg();
   const cu = conf.currency?.name || 'Coin';
   const bal = balanceOf();
-  const items = catalog(cur.profile, sh);
+  const { name: shopName, items } = shopShelf(sh);
+  const location = cur.state.player?.location;
   const inv = cur.bag.inv;
 
   const balBox =
@@ -1144,19 +1159,23 @@ function viewShop() {
   const row = (i) => {
     const n = inv[i.id] || 0;
     const can = bal >= (Number(i.price) || 0);
+    const fx = itemEffectChips(i);
     const tools = i.own
       ? `<button class="bc-ico" data-act="itemEdit" data-id="${esc(i.id)}" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
          <button class="bc-ico" data-act="itemDel" data-id="${esc(i.id)}" title="ลบ"><i class="fa-solid fa-trash"></i></button>`
       : '';
     return `<div class="bc-skill bc-item"><span class="bc-hexi"><i class="fa-solid fa-box-open"></i></span>
       <div class="bc-sbody"><div class="bc-line"><b>${esc(i.name)}</b>${n ? `<span class="bc-chip here">มี ×${n}</span>` : ''}</div>
-        ${i.desc ? `<div class="bc-dim">${esc(i.desc)}</div>` : ''}</div>${tools}
+        ${i.desc ? `<div class="bc-dim">${esc(i.desc)}</div>` : ''}${fx ? `<div class="bc-tags">${fx}</div>` : ''}</div>${tools}
       <button class="bc-btn sm bc-buy${can ? '' : ' poor'}" data-act="buy" data-id="${esc(i.id)}" ${can ? '' : 'disabled'}>
         <i class="fa-solid ${esc(conf.currency?.icon || 'fa-coins')}"></i>${fmtMoney(Number(i.price) || 0)}</button></div>`;
   };
 
   const cats = [...new Set(items.map((i) => i.cat || 'อื่นๆ'))];
-  const shelves = cats
+  const activeCategory = shopForm && shopForm !== '@new' ? 'ของที่เพิ่มเอง' : cats.includes(shopCategory) ? shopCategory : '';
+  const filter = `<select class="bc-input bc-sel" data-act="shopCategory" aria-label="หมวดสินค้า">
+    <option value="">ทุกหมวด</option>${cats.map((cat) => `<option value="${esc(cat)}"${cat === activeCategory ? ' selected' : ''}>${esc(cat)}</option>`).join('')}</select>`;
+  const shelves = cats.filter((cat) => !activeCategory || cat === activeCategory)
     .map((c) => `<div class="bc-cat">${esc(c)}</div>${items.filter((i) => (i.cat || 'อื่นๆ') === c).map((i) => (shopForm === i.id ? form(i) : row(i))).join('')}`)
     .join('');
 
@@ -1168,9 +1187,10 @@ function viewShop() {
     : '';
 
   return `<button type="button" class="bc-btn ghost bc-bag-open" data-tab="decorations"><i class="fa-solid fa-gem" aria-hidden="true"></i><span>ร้านแต้ม</span></button>${balBox}
-    <div class="bc-sec"><span>สินค้า</span><em class="bc-count">${items.length}</em><i class="bc-fill"></i>
+    <div class="bc-sec"><span>${esc(shopName || 'สินค้า')}</span><em class="bc-count">${items.length}</em><i class="bc-fill"></i>
       <button class="bc-btn sm" data-act="itemNew"><i class="fa-solid fa-plus"></i>เพิ่ม</button></div>
-    ${shopForm === '@new' ? form(null) : ''}${shelves}
+    ${shopName && location ? `<div class="bc-cat"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${esc(location)}</div>` : ''}
+    ${filter}${shopForm === '@new' ? form(null) : ''}${shelves}
     ${viewBag()}${history}`;
 }
 
@@ -1671,7 +1691,7 @@ function viewRel() {
 
 const stOf = (m) => {
   const v = String(m?.status ?? '').toLowerCase();
-  return v === 'done' ? 'done' : v === 'failed' ? 'failed' : 'active';
+  return v === 'failed' ? 'failed' : v === 'done' || (m?.completed && !m?.reopened) ? 'done' : 'active';
 };
 
 function missionFormHtml(id) {
@@ -1694,8 +1714,8 @@ function awardActivity(replyIndex = null) {
   const chat = JSON.stringify([...character, chatId]);
   const cached = progressStore.get();
   const missions = Object.entries(cur.state.mission || {})
-    .filter(([id, mission]) => stOf(mission) === 'done' && !Object.hasOwn(cached.missions, JSON.stringify([chat, id])))
-    .map(([id, mission]) => [id, mission.rank]);
+    .filter(([id, mission]) => (mission.completed || stOf(mission) === 'done') && !Object.hasOwn(cached.missions, JSON.stringify([chat, id])))
+    .map(([id, mission]) => [id, mission.completionRank || mission.rank]);
   let reply;
   if (replyIndex !== null && hasName(c, REQUIRED_NAME)) {
     let playerIndex = replyIndex - 1;
@@ -1731,6 +1751,7 @@ function viewDecorations() {
 function missionCard(id, m) {
   const meta = getMeta();
   const st = stOf(m);
+  if (st === 'done' && m.completed) m = { ...m, rank: m.completionRank || m.rank, progress: m.completionProgress || m.progress };
   const conf = shopCfg();
   const cu = conf.currency?.name || 'Coin';
   const b = parseBar(m.progress);
@@ -2159,7 +2180,7 @@ let licBusy = false;
 
 const LIC_MSG = {
   clock: 'นาฬิกาของเครื่องนี้ไม่ตรงกับเวลาจริง (ช้ากว่าเวลาที่ออกรหัสเกิน 5 นาที) ตั้งเวลาเป็นอัตโนมัติแล้วลองใหม่',
-  expired: 'รหัสนี้หมดอายุแล้ว',
+  expired: 'รหัสนี้หมดเวลาสำหรับเปิดใช้แล้ว',
   signature: 'รหัสไม่ถูกต้อง (ลายเซ็นไม่ตรง) ลองคัดลอกใหม่ให้ครบทั้งบรรทัด',
   format: 'รูปแบบรหัสไม่ถูกต้อง ต้องขึ้นต้นด้วย BC1. และคัดลอกมาให้ครบ',
 };
@@ -2191,7 +2212,7 @@ async function applyLicense() {
       if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
       return;
     }
-    extSlot().license = licenseKey();
+    storeLicense();
     saveApi();
     licDraft = '';
     licMsg = { ok: true, t: 'บันทึก Itemcode แล้ว' };
@@ -2211,6 +2232,13 @@ async function applyLicense() {
   }
 }
 
+function storeLicense() {
+  const slot = extSlot();
+  slot.license = licenseKey();
+  if (licenseActivation()) slot.licenseActivation = licenseActivation();
+  else delete slot.licenseActivation;
+}
+
 let licSyncAt = 0;
 async function syncLicense() {
   if (licBusy || Date.now() - licSyncAt < 60000) return;
@@ -2223,13 +2251,18 @@ async function syncLicense() {
     if (!res.ok) return;
     const data = await res.json();
     const saved = typeof data?.settings === 'string' ? JSON.parse(data.settings) : data?.settings;
-    const remote = saved?.extension_settings?.[EXT_ID]?.license;
+    const remoteSlot = saved?.extension_settings?.[EXT_ID];
+    const remote = remoteSlot?.license;
     if (premium()) {
-      if (!remote) { extSlot().license = licenseKey(); saveApi(); }
+      if (!remote || (remote === licenseKey() && licenseActivation() && remoteSlot.licenseActivation?.key !== remote)) {
+        storeLicense();
+        saveApi();
+      }
       return;
     }
-    if (licBusy || typeof remote !== 'string' || !remote || !await setLicense(remote, { preserveActive: true })) return;
-    extSlot().license = licenseKey();
+    if (licBusy || typeof remote !== 'string' || !remote || !await setLicense(remote, { preserveActive: true, savedActivation: remoteSlot?.licenseActivation })) return;
+    storeLicense();
+    saveApi();
     applyCfg();
     await initMemory();
     render();
@@ -2683,10 +2716,10 @@ const extSlot = () => {
   const all = ctx().extensionSettings;
   return all[EXT_ID] || (all[EXT_ID] = {});
 };
-const SYNC_CFG = ['theme', 'skin', 'transparent'];
+const SYNC_CFG = ['theme', 'skin', 'transparent', 'size', 'lock'];
 const LOCAL_WALL = 'bc_wall_local:';
 let prefs;
-let prefsDirty = false;
+const pendingPrefs = new Map();
 let pushTimer = 0;
 
 const activeSkin = () => (premium() && skinById(cfg.skin) ? cfg.skin : 'default');
@@ -2708,32 +2741,36 @@ function pullPrefs() {
   const doc = prefs.get();
   let changed = false;
   for (const key of SYNC_CFG) {
-    if (prefsDirty) break;
+    if (pendingPrefs.has(key)) continue;
     let value = prefValue(doc, key, undefined);
     if (value === undefined) continue;
     if (key === 'theme') value = value === 'light' ? 'light' : 'dark';
     else if (key === 'skin') value = skinById(value) ? value : 'default';
+    else if (key === 'size') value = clampN(Number(value) || CFG_DEFAULT.size, 36, 88);
+    else if (key === 'lock') value = value !== false;
     else value = clampN(Number(value) || 0, 0, 70);
     if (cfg[key] !== value) { cfg[key] = value; changed = true; }
   }
   return changed;
 }
 
-function pushPrefs(delay = 500) {
-  prefsDirty = true;
+async function flushPrefs() {
+  if (!prefs || !pendingPrefs.size) return;
+  const batch = new Map(pendingPrefs);
+  const saved = await prefs.update(doc => {
+    for (const [key, value] of batch) setPref(doc, key, value);
+    return true;
+  });
+  if (saved) {
+    for (const [key, value] of batch) if (pendingPrefs.get(key) === value) pendingPrefs.delete(key);
+    onPrefsChanged();
+  }
+}
+
+function pushPrefs(keys, delay = 500) {
+  for (const key of keys) pendingPrefs.set(key, cfg[key]);
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(async () => {
-    if (prefs) {
-      await prefs.update(doc => {
-        let any = false;
-        for (const key of SYNC_CFG) {
-          if (prefValue(doc, key, undefined) !== cfg[key]) { setPref(doc, key, cfg[key]); any = true; }
-        }
-        return any;
-      });
-    }
-    prefsDirty = false;
-  }, delay);
+  pushTimer = setTimeout(() => void flushPrefs(), delay);
 }
 
 function onPrefsChanged() {
@@ -2749,10 +2786,10 @@ async function saveWall(id, dataUrl) {
   try {
     if (!prefs) throw new Error('sync not ready');
     await uploadFile(headers, `bc_wall_${id}_${version}.jpg`, dataUrl.slice(dataUrl.indexOf(',') + 1));
-    await prefs.update(doc => { setPref(doc, 'wall.' + id, version); return true; });
+    if (!await prefs.update(doc => { setPref(doc, 'wall.' + id, version); return true; })) throw new Error('wallpaper reference not saved');
     try { localStorage.removeItem(LOCAL_WALL + id); } catch { }
-    if (previous) void deleteFile(headers, `bc_wall_${id}_${previous}.jpg`);
-    return 'server';
+    if (previous && prefs.isOnline()) void deleteFile(headers, `bc_wall_${id}_${previous}.jpg`);
+    return prefs.isOnline() ? 'server' : 'pending';
   } catch (error) {
     console.warn('[Bot Console] wallpaper upload failed, keeping it on this device only', error);
     localStorage.setItem(LOCAL_WALL + id, dataUrl);
@@ -2765,7 +2802,7 @@ async function clearWall(id) {
   try { localStorage.removeItem(LOCAL_WALL + id); } catch { }
   if (!prefs || !previous) return;
   await prefs.update(doc => { setPref(doc, 'wall.' + id, ''); return true; });
-  void deleteFile(ctx().getRequestHeaders?.(), `bc_wall_${id}_${previous}.jpg`);
+  if (prefs.isOnline()) void deleteFile(ctx().getRequestHeaders?.(), `bc_wall_${id}_${previous}.jpg`);
 }
 
 async function migrateLegacyWall() {
@@ -2788,6 +2825,7 @@ async function startPrefs() {
     empty: emptyPrefs, merge: mergePrefs, onChange: () => { if (prefs) onPrefsChanged(); },
   });
   await prefs.ready;
+  await flushPrefs();
   await prefs.update(doc => {
     let any = false;
     for (const key of SYNC_CFG) {
@@ -3068,7 +3106,7 @@ function mountUi() {
     if (!k) return;
     cfg[k] = Number(e.target.value);
     saveCfg();
-    if (SYNC_CFG.includes(k)) pushPrefs();
+    if (SYNC_CFG.includes(k)) pushPrefs([k]);
     applyCfg();
     const lab = $(`#bc-v-${k}`);
     if (lab) lab.textContent = k === 'size' ? `${cfg.size}px` : `${cfg.transparent}%`;
@@ -3089,6 +3127,7 @@ function mountUi() {
     if (act !== 'cfgLock') return;
     cfg.lock = e.target.checked;
     saveCfg();
+    pushPrefs(['lock']);
     placeFab(true);
     savePos();
   });
@@ -3133,7 +3172,7 @@ function mountUi() {
         cfg.size = CFG_DEFAULT.size;
         cfg.transparent = 0;
         saveCfg();
-        pushPrefs();
+        pushPrefs(['size', 'transparent']);
         savePos();
         applyCfg();
         placeFab(true);
@@ -3145,21 +3184,23 @@ function mountUi() {
         if (!premium()) break;
         cfg.skin = skinById(t.dataset.v) ? t.dataset.v : 'default';
         saveCfg();
-        pushPrefs(0);
+        pushPrefs(['skin'], 0);
         applyCfg();
         render();
         break;
       case 'wallPick': {
         if (!premium()) break;
+        const id = activeSkin();
         const picked = pickFile();
         (async () => {
           const f = await picked;
           if (!f) return;
           try {
-            const where = await saveWall(activeSkin(), await packWallpaper(f));
+            const where = await saveWall(id, await packWallpaper(f));
             applySkin();
             render();
             if (where === 'server') toast('success', 'เปลี่ยนวอลเปเปอร์ของธีมนี้แล้ว');
+            else if (where === 'pending') toast('warning', 'บันทึกรูปแล้ว กำลังรอซิงค์ค่ากับเซิร์ฟเวอร์');
             else toast('warning', 'บันทึกไว้เฉพาะเครื่องนี้ (อัปโหลดขึ้นเซิร์ฟเวอร์ไม่สำเร็จ)');
           } catch (err) {
             console.error('[Bot Console] wallpaper failed', err);
@@ -3396,7 +3437,7 @@ function mountUi() {
             const ms = m?.patch?.mission;
             return !(ms && Object.keys(ms).length === 1 && ms[id] && Object.keys(ms[id]).length === 1 && 'status' in ms[id]);
           });
-          meta.manual.push({ at: ctx().chat.length, patch: { mission: { [id]: { status: v } } } });
+          meta.manual.push({ at: ctx().chat.length, patch: { mission: { [id]: { status: v, reopened: t.dataset.act === 'mReopen' } } } });
         }
         rebuild();
         render();
@@ -3543,6 +3584,13 @@ function mountUi() {
 
   panel.addEventListener('change', async (e) => {
     const t = e.target;
+    if (t.dataset?.act === 'shopCategory') {
+      shopCategory = t.value;
+      shopForm = null;
+      render();
+      panel.querySelector('[data-act="shopCategory"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (t.dataset?.act === 'regexToggle') {
       const done = await setRegexEnabled(t.dataset.scope, t.dataset.key, t.checked);
       if (!done) t.checked = !t.checked;
@@ -3661,8 +3709,9 @@ jQuery(() => {
   }).catch(() => {});
   initMemory();
   void startPrefs().catch(error => console.warn('[Bot Console] settings sync failed', error));
-  void setLicense(extSlot().license).then(async (valid) => {
-    if (!valid) return;
+  void setLicense(extSlot().license, { savedActivation: extSlot().licenseActivation }).then(async (valid) => {
+    if (!valid) { void syncLicense(); return; }
+    if (licenseActivation() && !extSlot().licenseActivation) { storeLicense(); saveApi(); }
     applyCfg();
     await initMemory();
     render();

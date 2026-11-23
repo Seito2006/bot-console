@@ -1,3 +1,13 @@
+const missionMarkup = [
+  '<section class="bc-chat-mission" data-st="$1" aria-label="ภารกิจ">',
+  '<header><span class="bcm-state">$1</span><span class="bcm-rank">$3</span></header>',
+  '<strong class="bcm-title">$2</strong><div class="bcm-objective">$4</div>',
+  '<div class="bcm-count"><span>ความคืบหน้า</span><b>$5 / $6</b></div>',
+  '<progress value="$5" max="$6" aria-label="ความคืบหน้าภารกิจ"></progress>',
+  '<div class="bcm-reward"><b>รางวัล</b><span>$7</span></div><div class="bcm-note">$8</div>',
+  '</section>',
+].join('');
+
 const PALETTE_KEY = {
   '#3b9dff': 'ac', '#2f8cff': 'ac', '#6cc4ff': 'ac2',
   '#f4faff': 't1', '#dcebff': 't2', '#eaf4ff': 't2', '#cfe6ff': 't2', '#eaf5ff': 'pale',
@@ -30,7 +40,11 @@ export function themeRegex(scripts) {
     if (!script?.markdownOnly || script.promptOnly || typeof script.replaceString !== 'string') continue;
     const source = script.replaceString;
     if (checked.get(script) === source) continue;
-    if (tagged(script.findRegex) || knownGradient(source)) {
+    // Recognize the two bundled mission layouts, preserving custom Regex templates.
+    if (String(script.findRegex).includes('HI3_MISSION') &&
+        (source.includes('class="hi3-mission hm"') || (source.includes('class="hm-in"') && source.includes('class="hm-ttl"')))) {
+      script.replaceString = missionMarkup;
+    } else if (tagged(script.findRegex) || knownGradient(source)) {
       const themed = source.replace(visualMarkup, (markup, prefix, quote, value) =>
         prefix ? prefix + quote + colors(value) + quote : colors(markup));
       if (themed !== source) script.replaceString = themed;

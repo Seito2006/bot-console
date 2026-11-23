@@ -785,8 +785,8 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 #bc-panel.at-home.has-wall.custom-wall[data-skin] #bc-body > .bc-home {
   --portrait-shift: 0px; --portrait-space: clamp(190px,68cqw,320px);
   min-height: 100%;
-  background-size: auto, cover, auto;
-  background-position: 0 0, center top, 0 0;
+  background: linear-gradient(to bottom, transparent 16%, var(--home-wash) 70%),
+    var(--bc-wall) center top / cover no-repeat, var(--bc-bg2);
 }
 #bc-panel.custom-wall[data-skin] .bc-wallprev { background-size: cover; background-position: center top; }
 #bc-panel.at-home.has-wall .console-home :is(.bc-widget,.bc-app) { background: var(--home-plate); color: var(--home-text); }
@@ -799,4 +799,86 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 @media (max-height: 510px) and (orientation: landscape) {
   #bc-panel[data-skin] .bc-head { min-height: 42px; padding-block: 3px; }
   #bc-panel .bc-skin-dock:not([hidden]) { padding-block: 0; }
+}
+
+/* Roleplay mission cards. All decoration stays inside the header. */
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-line: var(--bcu-ac2, #88caff);
+  --mission-radius: 5px;
+  display: block;
+  box-sizing: border-box;
+  width: min(100%, 27rem);
+  min-width: 0;
+  margin: .8rem auto;
+  padding: .85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--mission-line) 52%, transparent);
+  border-inline-start: 3px solid var(--mission-line);
+  border-radius: var(--mission-radius);
+  background: linear-gradient(125deg, var(--bcu-deep, #182c47), #151525);
+  color: #f6f4fa;
+  font: inherit;
+  line-height: 1.5;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) header, #chat :is(.bcm-count, .custom-bcm-count), #chat :is(.bcm-reward, .custom-bcm-reward) {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .25em .7em;
+}
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) header { align-items: center; color: var(--mission-line); }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) header::before {
+  content: ""; width: 1.4em; height: 1.4em; flex: none;
+  background: currentColor; mask: var(--mission-icon) center / contain no-repeat;
+}
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission):not(:where([data-bc-skin] *)) header::before { display: none; }
+#chat :is(.bcm-state, .custom-bcm-state), #chat :is(.bcm-rank, .custom-bcm-rank) { font-size: .8em; font-weight: 700; }
+#chat :is(.bcm-rank, .custom-bcm-rank) { margin-inline-start: auto; padding: 0 .6em; border: 1px solid currentColor; border-radius: inherit; }
+#chat :is(.bcm-title, .custom-bcm-title) { display: block; font-size: 1.23em; color: #fff; margin: .45em 0 .12em; }
+#chat :is(.bcm-count, .custom-bcm-count) { margin-top: .7em; justify-content: space-between; font-size: .85em; }
+#chat :is(.bcm-count, .custom-bcm-count) b { font-variant-numeric: tabular-nums; }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) progress { display: block; width: 100%; height: 6px; border: 0; border-radius: 4px; overflow: hidden; appearance: none; background: #ffffff25; }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) progress::-webkit-progress-bar { background: #ffffff25; }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) progress::-webkit-progress-value { background: var(--mission-line); }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission) progress::-moz-progress-bar { background: var(--mission-line); }
+#chat :is(.bcm-reward, .custom-bcm-reward) { margin-top: .8em; border-top: 1px solid #ffffff30; padding-top: .55em; }
+#chat :is(.bcm-reward, .custom-bcm-reward) b { color: var(--mission-line); }
+#chat :is(.bcm-note, .custom-bcm-note) { font-size: .9em; color: #dedbe7; }
+#chat :is(.bcm-note, .custom-bcm-note):not(:empty) { margin-top: .35em; }
+#chat :is(.bcm-reward, .custom-bcm-reward):has(span:empty), #chat :is(.bcm-rank, .custom-bcm-rank):empty { display: none; }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission):is([data-st^="COMPLETE" i], [data-st^="สำเร็จ"]) :is(.bcm-state, .custom-bcm-state) { color: #a8ebc8; }
+#chat :is(.bc-chat-mission, .custom-bc-chat-mission):is([data-st="FAILED" i], [data-st="ล้มเหลว"]) :is(.bcm-state, .custom-bcm-state) { color: #ffb7bd; }
+
+[data-bc-skin="mei"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/decor/sakura.svg"); --mission-radius: 18px 3px;
+  border-bottom: 3px double var(--mission-line);
+}
+[data-bc-skin="kiana"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/kiana/cat-paw-cc0.svg"); --mission-radius: 17px;
+  border-inline-start-width: 1px; background: linear-gradient(110deg, #532338, #291722);
+}
+[data-bc-skin="kiana"] #chat :is(.bcm-reward, .custom-bcm-reward) { border-top-style: dashed; }
+[data-bc-skin="bronya"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/bronya/orchid-cc0.svg"); --mission-radius: 2px 14px 2px 2px;
+  background: linear-gradient(100deg, #191623 65%, #26293a);
+}
+[data-bc-skin="bronya"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) header { border-bottom: 1px dotted #a7dcec77; padding-bottom: .4em; }
+[data-bc-skin="theresa"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/decor/lunar-bats.svg"); --mission-radius: 22px 22px 4px 4px;
+  border: 3px double #b77c89; background: radial-gradient(ellipse at top, #501b31, #21111c);
+}
+[data-bc-skin="theresa"] #chat :is(.bcm-title, .custom-bcm-title) { text-align: center; }
+[data-bc-skin="fenghuang"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/decor/fenghuang-crest.svg"); --mission-radius: 3px 24px;
+  border-top: 3px solid var(--mission-line);
+}
+[data-bc-skin="sentience"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/decor/ink-circle.svg"); --mission-line: #e2bf86;
+  --mission-radius: 0; border-inline-start: 6px double var(--mission-line);
+  background: linear-gradient(105deg, #202938 80%, #35313d);
+}
+[data-bc-skin="seele"] #chat :is(.bc-chat-mission, .custom-bc-chat-mission) {
+  --mission-icon: url("./themes/decor/seele-butterfly.svg"); --mission-radius: 4px 26px 4px 22px;
+  background: radial-gradient(ellipse at top right, #344461, #202038 75%);
 }
