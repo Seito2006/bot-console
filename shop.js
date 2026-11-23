@@ -53,13 +53,13 @@ export function tryBuy(balance, price, qty = 1) {
   return { ok: true, balance: balance - cost, cost };
 }
 
-export function shopContextBlock({ balance, currency, inv, names, user }) {
+export function shopContextBlock({ balance, currency, inv, held, names, user }) {
   const cur = currency?.name || 'Coin';
-  const owned = Object.entries(inv || {})
+  const list = (items) => Object.entries(items || {})
     .filter(([, q]) => q > 0)
-    .map(([id, q]) => `${names[id] || id} x${q}`);
+    .map(([id, q]) => `${names[id] || id} x${q}`).join(', ') || 'none';
   const bal = Number.isFinite(balance) ? `${fmtMoney(balance)} ${cur}` : 'unknown';
-  return `[${user}'s wallet: ${bal}. Items ${user} owns (bought in the shop): ${owned.length ? owned.join(', ') : 'none'}. Treat this as true: ${user} cannot pay for or use what they do not have. If the story spends or earns money, add one hidden line at the end of the reply: <!--BC\nplayer.money: <new total number>\n-->]`;
+  return `[${user}'s wallet: ${bal}. In their bag: ${list(inv)}. Held temporarily outside the bag: ${list(held)}. Use these as the current carried quantities and respect the wallet balance. Items left elsewhere are available when retrieved in the story. If the story spends or earns money, add one hidden line at the end of the reply: <!--BC\nplayer.money: <new total number>\n-->]`;
 }
 
 export function rewardAmount(text, currencyName = 'Coin') {

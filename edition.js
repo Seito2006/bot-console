@@ -94,11 +94,11 @@ export async function parseKey(raw) {
 export const premium = () => !!active;
 export const licenseKey = () => active;
 
-export async function setLicense(raw) {
+export async function setLicense(raw, { preserveActive = false } = {}) {
   const r = await checkKey(raw);
-  active = r.key;
+  if (r.key || !preserveActive) active = r.key;
   lastReason = r.reason;
-  return !!active;
+  return !!r.key;
 }
 
 export function clearLicense() {

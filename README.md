@@ -30,6 +30,21 @@ SillyTavern จะดาวน์โหลดและโหลด Extension ใ
 
 ฟีเจอร์ที่ใช้ AI ต้องตั้งค่าผู้ให้บริการในหน้าตั้งค่าของ Extension รองรับ Google AI Studio, OpenRouter และ endpoint แบบ OpenAI-compatible โดยผู้ใช้ต้องใส่ API key ของตนเอง และไม่ควรนำ key ไปใส่ใน repository
 
+### เลเวลบัญชีและการอัปเดต
+
+- ภารกิจที่สำเร็จให้ EXP ตามความยาก แชทกับ HI3 Rpg และการขึ้นเลเวลให้ Point เบราว์เซอร์เก็บเลเวลและแต้มแยกตามบัญชี SillyTavern
+- Bot Console จะแจ้งเมื่อสาขาที่ติดตั้งผ่าน Git มีการเปลี่ยนแปลงบน GitHub ของโครงการ หลังจากกด **อัปเดต** รายการเปลี่ยนแปลงจะแสดงหนึ่งครั้งเมื่อการติดตั้งเสร็จ แล้วกด **โหลดหน้าใหม่** เพื่อใช้รุ่นล่าสุด ผู้เผยแพร่เพิ่มรายการของแต่ละเวอร์ชันใน `changelog.json`
+
+### แนบไฟล์อัปเดตบอท
+
+วางการ์ดที่ส่งออกจาก SillyTavern แบบ PNG หรือ JSON ในโฟลเดอร์ `bots/` แล้วกำหนดชื่อ เวอร์ชัน และชื่อไฟล์ใน `bot-update.json` ที่อยู่ข้าง `manifest.json` ตัวอย่างสำหรับผู้เผยแพร่
+
+```json
+{ "name": "HI3 Rpg", "version": "2.0.0", "file": "HI3 Rpg.png" }
+```
+
+ตั้งชื่อให้ตรงกับชื่อในการ์ด และเพิ่มเลขเวอร์ชันบอทเมื่อปล่อยไฟล์ใหม่ หากพบการ์ดชื่อตรงกันหลายใบ ให้ผู้เล่นเปิดแชทของการ์ดที่จะอัปเดต ป็อปอัปจะแสดงชื่อไฟล์เป้าหมายก่อนยืนยัน ระบบเขียนการ์ดทับชื่อไฟล์เดิมและเก็บแชทเดิมไว้ การ์ดแบบ PNG จะอัปเดตรูปด้วย ส่วน JSON จะใช้รูปที่ติดตั้งอยู่
+
 ## Troubleshooting
 
 - **Console button not showing** – the button only appears in chats with the bot named `HI3 Rpg` (change `REQUIRED_NAME` in `profiles.js`, or leave it empty to allow every bot). Alternatively open **Extensions → Seito's bot Console** and turn on *show in every chat*. The panel there also tells you why the button is hidden. *Settings → Reset button* restores its position and size.

@@ -9,11 +9,16 @@ import {
 import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
-import { premium, setLicense, licenseKey, licenseReason, clearLicense } from './edition.js';
+import { readTurns, syncTurnTexts, turnPrompt } from './roleplay.js';
+import { premium, setLicense, licenseKey, licenseReason } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
-import { applyChatUi, watchChat } from './ui-theme.js';
+import { themeRegex, themeVisibleCards } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
 import { DEFAULT_SHOP, rewardAmount, toMoney, fmtMoney, ensureShop, catalog, newItemId, tryBuy, shopContextBlock } from './shop.js';
+
+import { createProgressStore, grantActivity, accountLevel, missionExp, XP_PER_LEVEL, POINTS_PER_LEVEL } from './progress.js';
+import { createUpdater } from './updates.js';
+import { createBotUpdater } from './bot-update.js';
 
 const EXT_ID = 'bot_console';
 const TOP_KEY = 'bc_fab_top';
@@ -21,7 +26,7 @@ const CFG_KEY = 'bc_settings';
 const POS_KEY = 'bc_fab_pos';
 const ICON_URL = new URL('./icon.jpg', import.meta.url).href;
 const THEMES_URL = new URL('./themes/', import.meta.url).href;
-const SKINS_CSS = new URL('./skins.css', import.meta.url).href;
+const SKINS_CSS = new URL('./skins.css?v=turn-sync-1', import.meta.url).href;
 const TABS = [
   { id: 'player', label: 'ผู้เล่น', icon: 'fa-user' },
   { id: 'rel', label: 'ความสัมพันธ์', icon: 'fa-heart' },
@@ -34,6 +39,10 @@ const TABS = [
 ];
 
 let tab = 'home';
+let settingsSection = 'account';
+let progressStore;
+let updater;
+let botUpdater;
 let open = false;
 let editing = null;
 let imgMenu = null;
@@ -174,7 +183,8 @@ function seenForm(c, avatar) {
 function rebuild() {
   seenCache.clear();
   const md = hasChat() ? ctx().chatMetadata : null;
-  if (md !== lastMd) {
+  const changedChat = md !== lastMd;
+  if (changedChat) {
     lastMd = md;
     epoch++;
     phoneName = null; phoneDraft = {}; phoneBusy = {}; phoneSel = null; phoneForm = false;
@@ -195,6 +205,20 @@ function rebuild() {
   cur = { profile, state: computeState(profile, ctx().chat || [], meta.manual) };
   mergeCustomRel(cur.state, meta);
   mergeCustomMission(cur.state, meta);
+  awardActivity();
+  const chat = ctx().chat || [];
+  cur.bag = readTurns(chat, meta.shop, catalog(profile, meta.shop));
+  if (giftFor && !(cur.bag.inv[giftFor] > 0)) giftFor = null;
+  const contacts = [...Object.values(meta.phone.threads).map(th => th.name), ...Object.keys(cur.state.rel || {})];
+  const changed = syncTurnTexts(meta.phone, cur.bag.messages, {
+    contact: name => contacts.find(n => keyOf(n) === keyOf(name)) || contacts.find(n => sameName(n, name)) || name,
+    visible: phoneVisible,
+    stamp: storyStamp(),
+    incoming: (name, event) => {
+      if (!changedChat && !open && event.at === chat.length) showNotify(name, event.text);
+    },
+  });
+  if (changed) save();
   try { rememberForms(); } catch (e) { console.warn('[Bot Console] form memory failed', e); }
   try { pruneEvents(); cur.appts = collectAppts(); checkAppts(); } catch (e) { console.warn('[Bot Console] appointments failed', e); }
   applyUi();
@@ -419,9 +443,11 @@ function applyShopCtx(off = false) {
   if (cur && !off) {
     const sh = getMeta()?.shop;
     if (sh) {
-      const names = {};
-      for (const i of catalog(cur.profile, sh)) names[i.id] = i.name;
-      text = shopContextBlock({ balance: balanceOf(), currency: shopCfg().currency, inv: sh.inv, names, user: userName() });
+      const chat = c.chat || [];
+      const input = replacedReply && chat.at(-1) === replacedReply ? chat.slice(0, -1) : chat;
+      const bag = input !== chat || input.at(-1)?.extra?.bcBagTurn
+        ? readTurns(input, sh, catalog(cur.profile, sh), { beforeReply: true }) : cur.bag;
+      text = shopContextBlock({ balance: balanceOf(), currency: shopCfg().currency, ...bag, user: userName() });
     }
   }
   try {
@@ -486,7 +512,23 @@ function applyMemoryCtx(off = false) {
   }
 }
 
+let generationType = '';
+let replacedReply = null;
+let quietTasks = 0;
+
+function applyTurnPrompt(off) {
+  const c = ctx();
+  const enabled = cur && !off && !['quiet', 'impersonate'].includes(generationType);
+  const chat = c.chat || [];
+  const latest = replacedReply && chat.at(-1) === replacedReply ? chat.at(-2) : chat.at(-1);
+  const playerText = latest?.is_user && !latest.is_system ? latest.mes : '';
+  c.setExtensionPrompt?.(EXT_ID + '_turn', enabled ? turnPrompt(userName(), playerText) : '',
+    c.extension_prompt_types?.IN_CHAT ?? 1, 0, false, c.extension_prompt_roles?.SYSTEM ?? 0);
+}
+
 function applyPhoneCtx(off = false) {
+  off ||= quietTasks > 0;
+  applyTurnPrompt(off);
   applyMemoryCtx(off);
   applyThoughtPrompt(off);
   applyShopCtx(off);
@@ -509,10 +551,13 @@ function applyPhoneCtx(off = false) {
 }
 
 async function withoutPhoneCtx(fn) {
+  if (apiOn()) return fn();
+  quietTasks++;
   applyPhoneCtx(true);
   try {
     return await fn();
   } finally {
+    quietTasks--;
     applyPhoneCtx();
   }
 }
@@ -925,7 +970,7 @@ function maybeAuto() {
       if (fresh < a.every) return;
       a.lastLen = chat.length;
       save();
-      autoText(false);
+      if (![...cur.bag.messages.values()].some(m => m.at === chat.length)) autoText(false);
     } catch (e) {
       console.warn('[Bot Console] auto check failed', e);
     }
@@ -961,6 +1006,10 @@ function setBond(meta, relKey, r, value) {
   meta.manual.push({ at: ctx().chat.length, patch: { rel: { [relKey]: { bond: String(value) } } } });
 }
 
+function adjustBag(meta, item, delta) {
+  (meta.shop.adjustments ||= []).push({ at: ctx().chat.length, id: item.id, name: item.name, delta });
+}
+
 function buyItem(id) {
   const meta = getMeta();
   if (!meta || !cur) return;
@@ -973,7 +1022,7 @@ function buyItem(id) {
     return;
   }
   setMoney(meta, r.balance);
-  meta.shop.inv[id] = (meta.shop.inv[id] || 0) + 1;
+  adjustBag(meta, item, 1);
   meta.shop.log.push({ id, name: item.name, qty: 1, cost: r.cost, ...storyStamp(), ts: Date.now() });
   if (meta.shop.log.length > 40) meta.shop.log.splice(0, meta.shop.log.length - 40);
   rebuild();
@@ -984,12 +1033,12 @@ function buyItem(id) {
 
 function itemById(id) {
   const meta = getMeta();
-  return catalog(cur.profile, meta.shop).find((i) => i.id === id) || { id, name: meta.shop.log.find((l) => l.id === id)?.name || id, price: 0 };
+  return catalog(cur.profile, meta.shop).find((i) => i.id === id) || { id, name: cur.bag.names[id] || id, price: 0 };
 }
 
 function useItem(id) {
   const meta = getMeta();
-  if (!meta || !cur || !(meta.shop.inv[id] > 0)) return;
+  if (!meta || !cur || !(cur.bag.inv[id] > 0)) return;
   const item = itemById(id);
   const p = cur.state.player || {};
   const fx = [];
@@ -998,7 +1047,7 @@ function useItem(id) {
     const next = applyBar(p[key], item[key]);
     if (next) { setPlayer(meta, key, next); fx.push(`${label} ${item[key] > 0 ? '+' : ''}${item[key]}`); }
   }
-  meta.shop.inv[id] -= 1;
+  adjustBag(meta, item, -1);
   addEvent(`${userName()} used "${item.name}"${fx.length ? ` (${fx.join(', ')})` : ''}.`);
   rebuild();
   render();
@@ -1008,7 +1057,7 @@ function useItem(id) {
 
 function giveItem(id, who) {
   const meta = getMeta();
-  if (!meta || !cur || !(meta.shop.inv[id] > 0) || !who) return;
+  if (!meta || !cur || !(cur.bag.inv[id] > 0) || !who) return;
   const item = itemById(id);
   const relKey = Object.keys(cur.state.rel || {}).find((k) => keyOf(k) === keyOf(who));
   if (!relKey) return;
@@ -1016,7 +1065,7 @@ function giveItem(id, who) {
   const max = Number(r?.max) || Number(cur.profile.bondMax) || 100;
   const bond = Number(r?.bond) || 0;
   const next = Math.min(max, bond + giftBond(item));
-  meta.shop.inv[id] -= 1;
+  adjustBag(meta, item, -1);
   setBond(meta, relKey, r, next);
   const here = hereStatus(relKey).here;
   if (here) addEvent(`${userName()} gave "${item.name}" to ${relKey} (their bond with ${userName()} rose by ${next - bond}).`);
@@ -1028,6 +1077,44 @@ function giveItem(id, who) {
   if (!here) requestReply(relKey, 'gift', item.name);
 }
 
+function bagButton() {
+  const { inv, held } = cur.bag;
+  const count = new Set([...Object.keys(inv).filter(id => inv[id] > 0), ...Object.keys(held)]).size;
+  return `<button type="button" class="bc-btn ghost bc-bag-open" data-tab="bag">
+    <i class="fa-solid fa-box-open" aria-hidden="true"></i><span>คลังไอเทม</span>
+    <span class="bc-chip">${count} รายการ</span></button>`;
+}
+
+function viewBag() {
+  const { inv, held, names } = cur.bag;
+  const ownedIds = Object.keys(inv).filter((id) => inv[id] > 0);
+  const relNames = Object.keys(cur.state.rel || {});
+  const bagRow = (id) => {
+    const it = itemById(id);
+    const fx = [it?.hp ? `HP ${it.hp > 0 ? '+' : ''}${it.hp}` : '', it?.corr ? `Corruption ${it.corr > 0 ? '+' : ''}${it.corr}` : '']
+      .filter(Boolean)
+      .map((x) => `<span class="bc-chip">${x}</span>`)
+      .join('');
+    const gain = giftBond(it);
+    const picker =
+      giftFor === id
+        ? `<div class="bc-gift" data-form><select class="bc-input bc-sel" data-f="who">${relNames.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
+            <button class="bc-btn sm" data-primary data-act="giftSend" data-id="${esc(id)}">มอบให้ (+${gain} Bond)</button>
+            <button class="bc-btn sm ghost" data-act="cancelForm">ยกเลิก</button></div>`
+        : '';
+    return `<div class="bc-card bc-bagrow"><div class="bc-line"><b>${esc(it.name)}</b><span class="bc-chip here">มี ×${inv[id]}</span></div>
+      ${fx ? `<div class="bc-tags">${fx}</div>` : ''}
+      <div class="bc-btns"><button class="bc-btn sm" data-act="useItem" data-id="${esc(id)}"><i class="fa-solid fa-hand-holding-medical"></i>ใช้</button>
+      <button class="bc-btn sm ghost" data-act="giftOpen" data-id="${esc(id)}"><i class="fa-solid fa-gift"></i>มอบให้</button></div>${picker}</div>`;
+  };
+  const carried = Object.entries(held);
+  const temporary = carried.length ? `<div class="bc-sec"><span>ถือไว้ชั่วคราว</span><i class="bc-fill"></i></div>
+    ${carried.map(([id, quantity]) => `<div class="bc-row bc-held-item"><b>${esc(names[id] || id)}</b><span class="bc-chip">×${quantity}</span></div>`).join('')}` : '';
+  const bag = ownedIds.map(bagRow).join('');
+  return `<div class="bc-sec"><span>ในกระเป๋า</span><em class="bc-count">${ownedIds.length}</em><i class="bc-fill"></i></div>
+    ${bag || empty(carried.length ? 'กระเป๋ายังว่างอยู่' : 'คลังยังว่างอยู่<br>ของที่ซื้อหรือพกในโรลเพลย์จะปรากฏที่นี่')}${temporary}`;
+}
+
 function viewShop() {
   const meta = getMeta();
   const sh = meta.shop;
@@ -1035,7 +1122,7 @@ function viewShop() {
   const cu = conf.currency?.name || 'Coin';
   const bal = balanceOf();
   const items = catalog(cur.profile, sh);
-  const inv = sh.inv || {};
+  const inv = cur.bag.inv;
 
   const balBox =
     editing === 'money'
@@ -1073,28 +1160,6 @@ function viewShop() {
     .map((c) => `<div class="bc-cat">${esc(c)}</div>${items.filter((i) => (i.cat || 'อื่นๆ') === c).map((i) => (shopForm === i.id ? form(i) : row(i))).join('')}`)
     .join('');
 
-  const ownedIds = Object.keys(inv).filter((id) => inv[id] > 0);
-  const nameOf = (id) => items.find((i) => i.id === id)?.name || sh.log.find((l) => l.id === id)?.name || id;
-  const relNames = Object.keys(cur.state.rel || {});
-  const bagRow = (id) => {
-    const it = items.find((i) => i.id === id);
-    const fx = [it?.hp ? `HP ${it.hp > 0 ? '+' : ''}${it.hp}` : '', it?.corr ? `Corruption ${it.corr > 0 ? '+' : ''}${it.corr}` : '']
-      .filter(Boolean)
-      .map((x) => `<span class="bc-chip">${x}</span>`)
-      .join('');
-    const gain = giftBond(it);
-    const picker =
-      giftFor === id
-        ? `<div class="bc-gift" data-form><select class="bc-input bc-sel" data-f="who">${relNames.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
-            <button class="bc-btn sm" data-primary data-act="giftSend" data-id="${esc(id)}">มอบให้ (+${gain} Bond)</button>
-            <button class="bc-btn sm ghost" data-act="cancelForm">ยกเลิก</button></div>`
-        : '';
-    return `<div class="bc-card bc-bagrow"><div class="bc-line"><b>${esc(nameOf(id))}</b><span class="bc-chip here">มี ×${inv[id]}</span></div>
-      ${fx ? `<div class="bc-tags">${fx}</div>` : ''}
-      <div class="bc-btns"><button class="bc-btn sm" data-act="useItem" data-id="${esc(id)}"><i class="fa-solid fa-hand-holding-medical"></i>ใช้</button>
-      <button class="bc-btn sm ghost" data-act="giftOpen" data-id="${esc(id)}"><i class="fa-solid fa-gift"></i>มอบให้</button></div>${picker}</div>`;
-  };
-  const bag = ownedIds.length ? ownedIds.map(bagRow).join('') : empty('ยังไม่มีของ<br>ซื้อของจากร้านด้านบนได้เลย');
   const recent = sh.log.slice(-5).reverse();
   const history = recent.length
     ? `<div class="bc-sec"><span>ซื้อล่าสุด</span><i class="bc-fill"></i></div>${recent
@@ -1102,11 +1167,11 @@ function viewShop() {
         .join('')}`
     : '';
 
-  return `${balBox}
+  return `<button type="button" class="bc-btn ghost bc-bag-open" data-tab="decorations"><i class="fa-solid fa-gem" aria-hidden="true"></i><span>ร้านแต้ม</span></button>${balBox}
     <div class="bc-sec"><span>สินค้า</span><em class="bc-count">${items.length}</em><i class="bc-fill"></i>
       <button class="bc-btn sm" data-act="itemNew"><i class="fa-solid fa-plus"></i>เพิ่ม</button></div>
     ${shopForm === '@new' ? form(null) : ''}${shelves}
-    <div class="bc-sec"><span>ของที่มี</span><em class="bc-count">${ownedIds.length}</em><i class="bc-fill"></i></div>${bag}${history}`;
+    ${viewBag()}${history}`;
 }
 
 function apiCfg() {
@@ -1533,7 +1598,7 @@ function viewPlayer() {
     (skillForm !== null ? skillFormHtml() : '') +
     (items || (skillForm === null ? empty('ยังไม่มีสกิล<br>กด “เพิ่ม” เพื่อใส่สกิลที่ครอบครอง') : ''));
 
-  return `${hero}${tiles}
+  return `${hero}${bagButton()}${tiles}
     <div class="bc-sec"><span>สกิลที่ครอบครอง</span><em class="bc-count">${skills.length}</em><i class="bc-fill"></i>
       <button class="bc-btn sm" data-act="skillNew"><i class="fa-solid fa-plus"></i>เพิ่ม</button></div>${skillBody}`;
 }
@@ -1621,6 +1686,48 @@ function missionFormHtml(id) {
     <button class="bc-btn ghost" data-act="cancelForm">ยกเลิก</button></div></div>`;
 }
 
+function awardActivity(replyIndex = null) {
+  const c = ctx();
+  const chatId = c.getCurrentChatId?.() ?? c.chatId;
+  if (!progressStore || !cur || chatId == null || ctx().chatMetadata !== lastMd) return;
+  const character = c.groupId ? ['group', c.groupId] : ['character', c.characters?.[c.characterId]?.avatar || c.name2];
+  const chat = JSON.stringify([...character, chatId]);
+  const cached = progressStore.get();
+  const missions = Object.entries(cur.state.mission || {})
+    .filter(([id, mission]) => stOf(mission) === 'done' && !Object.hasOwn(cached.missions, JSON.stringify([chat, id])))
+    .map(([id, mission]) => [id, mission.rank]);
+  let reply;
+  if (replyIndex !== null && hasName(c, REQUIRED_NAME)) {
+    let playerIndex = replyIndex - 1;
+    while (playerIndex >= 0 && c.chat[playerIndex]?.is_system) playerIndex--;
+    const player = c.chat[playerIndex];
+    if (player?.is_user) reply = [playerIndex, player.send_date ?? ''];
+    if (reply && Object.hasOwn(cached.replies, JSON.stringify([chat, reply]))) reply = null;
+  }
+  if (!missions.length && !reply) return;
+  void progressStore.update(account => {
+    const result = grantActivity(account, chat, missions, reply);
+    return (result.xp || result.points) ? result : false;
+  }).then(result => {
+    if (result?.levels) toast('success', `เลเวลอัป! +${result.levels * POINTS_PER_LEVEL} Point`);
+  });
+}
+
+function accountCard() {
+  const { xp, points } = progressStore.get();
+  const step = xp % XP_PER_LEVEL;
+  return `<section class="bc-card bc-account"><div class="bc-line">
+    <div><div class="bc-h">บัญชีในเครื่อง</div><b class="bc-account-level">เลเวล ${accountLevel(xp)}</b></div>
+    <b class="bc-account-points"><i class="fa-solid fa-gem" aria-hidden="true"></i> ${fmtMoney(points)} Point</b></div>
+    <progress class="bc-account-xp" aria-label="ความคืบหน้าเลเวลบัญชี" value="${step}" max="${XP_PER_LEVEL}"></progress>
+    <div class="bc-line"><span class="bc-dim">${step} / ${XP_PER_LEVEL} EXP</span>
+    ${tab === 'decorations' ? '' : '<button type="button" class="bc-btn sm ghost" data-tab="decorations">ร้านแต้ม</button>'}</div></section>`;
+}
+
+function viewDecorations() {
+  return accountCard() + '<div class="bc-card bc-coming-soon">Coming Soon</div>';
+}
+
 function missionCard(id, m) {
   const meta = getMeta();
   const st = stOf(m);
@@ -1653,7 +1760,7 @@ function missionCard(id, m) {
        <button class="bc-ico" data-act="mDel" data-id="${esc(id)}" title="ลบ"><i class="fa-solid fa-trash"></i></button></span>`
     : '';
   return `<div class="bc-card bc-mission ${st}"><div class="bc-line"><b class="bc-mt">${esc(m.title || id)}</b>${tools}</div>
-    <div class="bc-tags">${m.rank ? `<span class="bc-chip">${esc(m.rank)}</span>` : ''}${stChip}${m.giver ? `<span class="bc-chip">จาก ${esc(m.giver)}</span>` : ''}${m.custom ? '<span class="bc-chip">ของฉัน</span>' : ''}</div>
+    <div class="bc-tags">${m.rank ? `<span class="bc-chip">${esc(m.rank)}</span>` : ''}${stChip}<span class="bc-chip">+${missionExp(m.rank)} EXP บัญชี</span>${m.giver ? `<span class="bc-chip">จาก ${esc(m.giver)}</span>` : ''}${m.custom ? '<span class="bc-chip">ของฉัน</span>' : ''}</div>
     ${m.objective ? `<div class="bc-mobj">${esc(m.objective)}</div>` : ''}${prog}${reward}
     ${m.log ? `<div class="bc-dim bc-mlog">${esc(m.log)}</div>` : ''}
     <div class="bc-btns bc-macts">${acts.join('')}</div></div>`;
@@ -2047,6 +2154,7 @@ function viewUi() {
 const autoCfg = () => ensureAuto(getMeta().phone, (ctx().chat || []).length);
 
 let licMsg = null;
+let licDraft = '';
 let licBusy = false;
 
 const LIC_MSG = {
@@ -2057,12 +2165,10 @@ const LIC_MSG = {
 };
 
 function licenseCardHtml() {
-  if (premium()) return '';
-  return `<div class="bc-card"><div class="bc-line"><div class="bc-h">รหัสปลดล็อค Premium</div><span class="bc-ed free">Free</span></div>
-      <div class="bc-dim">ใส่ Premium license ที่ได้รับ เพื่อเปิดสกินตัวละคร วอลเปเปอร์ และความจำสถานะ (รหัสขึ้นต้นด้วย BC1.)</div>
-      <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="BC1.…">
-        <button class="bc-segb" data-act="licApply" disabled><i class="fa-solid fa-unlock"></i>ปลดล็อค</button></div>
-      <div id="bc-licmsg" class="bc-licmsg${licMsg ? (licMsg.ok ? ' ok' : ' bad') : ''}">${licMsg ? esc(licMsg.t) : ''}</div></div>`;
+  return `<div class="bc-card"><div class="bc-h">Itemcode</div>
+      <div class="bc-licrow"><input id="bc-lic" class="bc-input" type="password" aria-label="Itemcode" value="${esc(licDraft)}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1024" placeholder="Itemcode">
+        <button class="bc-segb" data-act="licApply" ${licBusy || !licDraft.trim() ? 'disabled' : ''}><i class="fa-solid fa-unlock"></i>ใช้รหัส</button></div>
+      <div id="bc-licmsg" role="status" class="bc-licmsg${licMsg ? (licMsg.ok ? ' ok' : ' bad') : ''}">${licMsg ? esc(licMsg.t) : ''}</div></div>`;
 }
 
 async function applyLicense() {
@@ -2070,7 +2176,7 @@ async function applyLicense() {
   const inp = $('#bc-lic');
   const raw = inp?.value || '';
   if (!String(raw).trim()) {
-    licMsg = { ok: false, t: 'ใส่ Premium license ก่อน' };
+    licMsg = { ok: false, t: 'กรอก Itemcode ก่อน' };
     const el = $('#bc-licmsg');
     if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
     return;
@@ -2079,7 +2185,7 @@ async function applyLicense() {
   const button = panel?.querySelector('[data-act="licApply"]');
   if (button) button.disabled = true;
   try {
-    if (!await setLicense(raw)) {
+    if (!await setLicense(raw, { preserveActive: true })) {
       licMsg = { ok: false, t: LIC_MSG[licenseReason()] || LIC_MSG.format };
       const el = $('#bc-licmsg');
       if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
@@ -2087,11 +2193,12 @@ async function applyLicense() {
     }
     extSlot().license = licenseKey();
     saveApi();
-    licMsg = null;
+    licDraft = '';
+    licMsg = { ok: true, t: 'บันทึก Itemcode แล้ว' };
     applyCfg();
     await initMemory();
     render();
-    toast('success', 'ปลดล็อค Premium แล้ว');
+    toast('success', 'ใช้ Itemcode สำเร็จ');
   } catch (e) {
     console.warn('[Bot Console] license verification failed', e);
     licMsg = { ok: false, t: 'ตรวจสอบรหัสไม่สำเร็จ กรุณาใช้เบราว์เซอร์เวอร์ชันล่าสุด' };
@@ -2110,7 +2217,7 @@ async function applyLicense() {
 // comes back to the foreground adopts a newer key, and puts ours back if another page wiped it.
 let licSyncAt = 0;
 async function syncLicense() {
-  if (Date.now() - licSyncAt < 60000) return;
+  if (licBusy || Date.now() - licSyncAt < 60000) return;
   licSyncAt = Date.now();
   try {
     const c = ctx();
@@ -2125,12 +2232,12 @@ async function syncLicense() {
       if (!remote) { extSlot().license = licenseKey(); saveApi(); }
       return;
     }
-    if (typeof remote !== 'string' || !remote || !await setLicense(remote)) return;
+    if (licBusy || typeof remote !== 'string' || !remote || !await setLicense(remote, { preserveActive: true })) return;
     extSlot().license = licenseKey();
     applyCfg();
     await initMemory();
     render();
-    toast('success', 'พบรหัส Premium ที่บันทึกไว้ในเซิร์ฟเวอร์ ปลดล็อคให้แล้ว');
+    toast('success', 'พบ Itemcode ที่บันทึกไว้ในเซิร์ฟเวอร์');
   } catch (e) {
     console.warn('[Bot Console] license sync failed', e);
   }
@@ -2138,11 +2245,11 @@ async function syncLicense() {
 
 function skinCardHtml() {
   const tile = (id, title, who, img, on, lock) => `<button class="bc-skin${on ? ' on' : ''}${lock ? ' lock' : ''}" ${lock ? 'disabled' : `data-act="setSkin" data-v="${id}"`}>
-      <span class="bc-skth">${img ? `<img src="${esc(THEMES_URL + img)}" alt="" loading="lazy" decoding="async">` : ''}</span>${lock ? '<i class="fa-solid fa-lock bc-lk"></i>' : ''}
+      <span class="bc-skth">${img ? `<img src="${esc(THEMES_URL + img)}" alt="" loading="lazy" decoding="async" draggable="false">` : ''}</span>${lock ? '<i class="fa-solid fa-lock bc-lk"></i>' : ''}
       <span class="bc-skn"><b>${esc(title)}</b><em>${esc(who)}</em>${lock ? '<u>สำหรับ Premium Version</u>' : ''}</span></button>`;
   const active = premium() ? cfg.skin : 'default';
   const tiles = [tile('default', 'ปกติ', 'Console', '', active === 'default', false)]
-    .concat(SKINS.map((k) => tile(k.id, k.title, k.who, k.card, premium() && active === k.id, !premium())));
+    .concat(SKINS.map((k) => tile(k.id, k.title, k.who, k.wall, premium() && active === k.id, !premium())));
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">สกินตัวละคร</div><span class="bc-ed${premium() ? '' : ' free'}">${premium() ? 'Premium' : 'Free'}</span></div>
       <div class="bc-skins">${tiles.join('')}</div></div>
     <div class="bc-card"><div class="bc-h">วอลเปเปอร์</div>
@@ -2150,17 +2257,19 @@ function skinCardHtml() {
       <div class="bc-seg"><button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallPick"${premium() ? '' : ' disabled'}><i class="fa-solid fa-image"></i>เลือกรูป</button>
         <button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallClear"${premium() ? '' : ' disabled'}><i class="fa-solid fa-rotate-left"></i>ใช้ของสกิน</button></div>
       ${premium() ? '' : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>
-    <div class="bc-card"><div class="bc-h">ความจำสถานะ</div>
+`;
+}
+
+function memorySettings() {
+  return `<div class="bc-card"><div class="bc-h">ความจำสถานะ</div>
       <div class="bc-opt"><div><div class="bc-ot">ตัดแท็กเก่าออกจากสิ่งที่ส่งให้โมเดล</div>
         <div class="bc-dim">เก็บเฉพาะค่าล่าสุดของความสัมพันธ์และเควสต์ ข้อความในแชทไม่ถูกแก้</div></div>
         <label class="bc-sw"><input type="checkbox" data-act="memOn" ${premium() && extSlot().mem !== false ? 'checked' : ''}${premium() ? '' : ' disabled'}><span></span></label></div>
       ${premium() ? (memReady ? '' : `<div class="bc-locknote"><i class="fa-solid fa-circle-info"></i>${memMissing ? 'ไม่พบไฟล์ memory.js ของ Premium ในโฟลเดอร์ส่วนเสริม' : 'SillyTavern เวอร์ชันนี้ไม่รองรับ (ใช้ได้กับ Chat Completion)'}</div>`) : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>`;
 }
 
-function viewSettings() {
-  return `${skinCardHtml()}
-    ${licenseCardHtml()}
-    <div class="bc-card"><div class="bc-h">ปุ่ม Console</div>
+function consoleSettings() {
+  return `<div class="bc-card"><div class="bc-h">ปุ่ม Console</div>
       <div class="bc-opt"><div><div class="bc-ot">ล็อคปุ่มไว้ข้างจอ</div></div>
         <label class="bc-sw"><input type="checkbox" data-act="cfgLock" ${cfg.lock ? 'checked' : ''}><span></span></label></div>
       <div class="bc-rng"><div class="bc-line"><span>ขนาด</span><b id="bc-v-size">${cfg.size}px</b></div>
@@ -2169,8 +2278,11 @@ function viewSettings() {
         <input type="range" min="0" max="70" step="5" value="${cfg.transparent}" data-cfg="transparent"></div>
       <button class="bc-segb" data-act="fabReset"><i class="fa-solid fa-arrows-to-dot"></i>รีเซ็ตตำแหน่งและขนาดปุ่ม</button></div>
     <div class="bc-card"><div class="bc-h">ซิงค์ข้อมูล</div>
-      <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>
-    <div class="bc-card"><div class="bc-h">ข้อความ</div>
+      <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>`;
+}
+
+function roleplaySettings() {
+  return `${memorySettings()}<div class="bc-card"><div class="bc-h">ข้อความ</div>
       <div class="bc-opt"><div><div class="bc-ot">ให้เนื้อเรื่องรู้ข้อความที่คุยกัน</div></div>
         <label class="bc-sw"><input type="checkbox" data-act="phoneShare" ${getMeta()?.phone?.share === false ? '' : 'checked'}><span></span></label></div>
       <div class="bc-opt"><div><div class="bc-ot">ให้ตัวละครส่งข้อความมาเอง</div></div>
@@ -2186,6 +2298,28 @@ function viewSettings() {
         <label class="bc-sw"><input type="checkbox" data-act="appointOn" ${getMeta()?.appointOn === false ? '' : 'checked'}><span></span></label></div></div>`;
 }
 
+function updateActions() {
+  const { status } = updater.get();
+  const bot = botUpdater.get();
+  const available = ['available', 'installed', 'failed', 'forbidden'].includes(status);
+  return `<div class="bc-btns bc-update-links">
+    ${available ? '<button type="button" class="bc-btn sm" data-act="checkUpdate">อัปเดตส่วนเสริม</button>' : ''}
+    ${bot ? `<button type="button" class="bc-btn sm ghost" data-act="botUpdate">อัปเดตบอท · ${esc(bot.name)}</button>` : ''}</div>`;
+}
+
+function viewSettings() {
+  const sections = [
+    ['account', 'บัญชีและ Itemcode', () => accountCard() + licenseCardHtml()],
+    ['theme', 'ธีมและวอลเปเปอร์', skinCardHtml],
+    ['roleplay', 'โรลเพลย์', roleplaySettings],
+    ['system', 'ทั่วไป', () => consoleSettings() + updateActions()],
+  ];
+  const current = sections.find(([id]) => id === settingsSection) || sections[0];
+  const buttons = sections.map(([id, label]) => `<button type="button" class="bc-segb${id === current[0] ? ' on' : ''}"
+    aria-pressed="${id === current[0]}" data-act="settingsSection" data-id="${id}">${label}</button>`).join('');
+  return `<nav class="bc-settings-sections" aria-label="หมวดการตั้งค่า">${buttons}</nav>${current[2]()}`;
+}
+
 function viewHome() {
   const p = cur?.state?.player || {};
   const now = new Date();
@@ -2193,16 +2327,92 @@ function viewHome() {
   const date = String(p.date || '').trim() || now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short' });
   const where = [p.location, p.weather].map((x) => String(x || '').trim()).filter(Boolean).join(' · ');
   const apps = TABS.map((t) => `<button class="bc-app" data-tab="${t.id}">${t.id === 'phone' ? '<b class="bc-badge" hidden></b>' : ''}<span class="bc-ai"><i class="fa-solid ${t.icon}"></i></span><span class="bc-al">${esc(t.label)}</span></button>`).join('');
-  return `<div class="bc-home">
-    <div class="bc-status"><span>${esc(clock)}</span><span class="bc-sti"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
-    <div class="bc-widget"><div class="bc-clock">${esc(clock)}</div><div class="bc-wd"><b>${esc(date)}</b>${where ? `<span>${esc(where)}</span>` : ''}</div></div>
-    <div class="bc-apps">${apps}</div></div>`;
+  const meiMode = premium() && cfg.skin === 'mei';
+  const kianaMode = premium() && cfg.skin === 'kiana';
+  if (premium() && cfg.skin === 'seele') {
+    return `<div class="bc-home rebirth-home">
+      <header class="rebirth-title"><div><span>Seele Vollerei</span><h2 lang="en">Herrscher of Rebirth</h2></div>
+        <div class="rebirth-time"><strong>${esc(clock)}</strong><small>${esc(date)}</small></div></header>
+      <nav class="rebirth-wings" aria-label="เมนูหลัก">${apps}</nav>
+      ${where ? `<p class="folio-place">${esc(where)}</p>` : ''}</div>`;
+  }
+  if (premium() && cfg.skin === 'fenghuang') {
+    return `<div class="bc-home phoenix-home">
+      <header class="phoenix-sky"><h2 lang="en">Fenghuang</h2><div class="phoenix-sunset">
+        <strong>${esc(clock)}</strong><span>${esc(date)}</span></div></header>
+      <nav class="phoenix-feathers" aria-label="เมนูหลัก">${apps}</nav>
+      ${where ? `<p class="hua-place">${esc(where)}</p>` : ''}
+    </div>`;
+  }
+  if (premium() && cfg.skin === 'sentience') {
+    return `<div class="bc-home sentience-home">
+      <header class="ink-spine"><h2 lang="en">Sentience</h2><strong>${esc(clock)}</strong></header>
+      <section class="ink-sheet"><p class="ink-date">${esc(date)}</p>
+        <nav class="ink-index" aria-label="เมนูหลัก">${apps}</nav>
+        ${where ? `<p class="hua-place">${esc(where)}</p>` : ''}
+      </section>
+    </div>`;
+  }
+  if (premium() && cfg.skin === 'theresa') {
+    return `<div class="bc-home lunar-book">
+      <header class="lunar-cover">
+        <span class="lunar-moon" aria-hidden="true"></span>
+        <span class="lunar-author">Theresa Apocalypse</span>
+        <h2 lang="en">Lunar Vow</h2>
+        <div class="lunar-time"><strong>${esc(clock)}</strong><span>${esc(date)}</span></div>
+        ${where ? `<p>${esc(where)}</p>` : ''}
+      </header>
+      <nav class="lunar-index" aria-label="เมนูหลัก">${apps}</nav>
+    </div>`;
+  }
+  if (premium() && cfg.skin === 'bronya') {
+    return `<div class="bc-home bronya-home">
+      <header class="bc-night-heading">
+        <span>Bronya Zaychik</span><h2 lang="en">Heart of the Night</h2>
+      </header>
+      <nav class="bc-night-dial" aria-label="เมนูหลัก">
+        <div class="bc-night-time"><strong>${esc(clock)}</strong><span>${esc(date)}</span></div>
+        ${apps}
+      </nav>
+      ${where ? `<p class="bc-night-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span>${esc(where)}</span></p>` : ''}
+    </div>`;
+  }
+    const location = where ? `<p class="folio-place">${esc(where)}</p>` : '';
+  if (meiMode) {
+    return `<div class="bc-home mei-home">
+      <header class="mei-dawn"><div class="mei-halo"><span>Raiden Mei</span><strong>${esc(clock)}</strong><small>${esc(date)}</small></div>
+      <h2 lang="en">Xentinel</h2></header>
+      <nav class="mei-petals" aria-label="เมนูหลัก">${apps}</nav>${location}</div>`;
+  }
+  if (kianaMode) {
+    return `<div class="bc-home kiana-home">
+      <header class="pop-ticket"><div><span>Kiana Kaslana</span><h2 lang="en">Ba-Dum!</h2></div>
+        <div class="pop-stub"><strong>${esc(clock)}</strong><small>${esc(date)}</small></div></header>
+      <nav class="pop-stage" aria-label="เมนูหลัก">${apps}</nav>${location}</div>`;
+  }
+  return `<div class="bc-home console-home">
+    <header class="bc-widget"><div class="bc-clock">${esc(clock)}</div><div class="bc-wd"><b>${esc(date)}</b>${where ? `<span>${esc(where)}</span>` : ''}</div></header>
+    <nav class="bc-apps" aria-label="เมนูหลัก">${apps}</nav></div>`;
 }
-
 function render() {
   if (!panel) return;
   const body = $('#bc-body');
   panel.classList.toggle('at-home', tab === 'home');
+  const dock = panel.querySelector('.bc-skin-dock');
+  const dockTab = tab === 'bag' ? 'player' : tab === 'decorations' ? 'shop' : tab;
+  const showDock = !!cur && !!skinById(panel.dataset.skin) && tab !== 'home';
+  dock.hidden = !showDock;
+  if (showDock && dock.dataset.current !== dockTab) {
+    dock.dataset.current = dockTab;
+    for (const button of dock.children) {
+      if (button.dataset.tab === dockTab) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
+    const current = dock.querySelector('[aria-current]');
+    if (current && dock.scrollWidth > dock.clientWidth) {
+      dock.scrollLeft = current.offsetLeft - (dock.clientWidth - current.offsetWidth) / 2;
+    }
+  }
   if (!cur) {
     $('#bc-title').textContent = "Seito's bot Console";
     body.classList.remove('phone');
@@ -2212,9 +2422,14 @@ function render() {
     return;
   }
   const app = TABS.find((t) => t.id === tab);
-  $('#bc-title').textContent = app ? app.label : cur.profile.label;
+  $('#bc-title').textContent = tab === 'bag' ? 'คลังไอเทม' : tab === 'decorations' ? 'ร้านแต้ม' : app?.label || cur.profile.label;
+  const back = $('#bc-back');
+  back.title = tab === 'bag' ? 'กลับหน้าผู้เล่น' : tab === 'decorations' ? 'กลับร้านค้า' : 'กลับหน้าหลัก';
+  back.setAttribute('aria-label', back.title);
   const ta0 = $('.bcp-ta');
   const box0 = $('.bcp-msgs');
+  const licenseFocused = document.activeElement?.id === 'bc-lic';
+  const licenseCaret = licenseFocused ? document.activeElement.selectionStart : null;
   let hadFocus = false;
   let selS = 0;
   let selE = 0;
@@ -2227,7 +2442,7 @@ function render() {
   const stick = phoneStick || !box0 || box0.scrollHeight - box0.scrollTop - box0.clientHeight < 90;
   const top0 = box0 ? box0.scrollTop : 0;
   body.classList.toggle('phone', tab === 'phone');
-  const views = { home: viewHome, player: viewPlayer, rel: viewRel, phone: viewPhone, shop: viewShop, mission: viewMission, appt: viewAppt, ui: viewUi, settings: viewSettings };
+  const views = { home: viewHome, player: viewPlayer, bag: viewBag, rel: viewRel, phone: viewPhone, shop: viewShop, decorations: viewDecorations, mission: viewMission, appt: viewAppt, ui: viewUi, settings: viewSettings };
   let html;
   try {
     html = views[tab]();
@@ -2242,7 +2457,18 @@ function render() {
   const tabChanged = body._bcTab !== tab;
   body._bcTab = tab;
   body._bcHtml = html;
+  const previousRail = !tabChanged && body.querySelector('.bc-skins');
+  const railLeft = previousRail ? previousRail.scrollLeft : 0;
   body.innerHTML = html;
+  if (licenseFocused && licDraft) {
+    const field = $('#bc-lic');
+    field?.focus({ preventScroll: true });
+    if (licenseCaret !== null) field?.setSelectionRange(licenseCaret, licenseCaret);
+  }
+  if (railLeft) {
+    const rail = body.querySelector('.bc-skins');
+    if (rail) rail.scrollLeft = railLeft;
+  }
   if (tabChanged) {
     body.scrollTop = 0;
     body.classList.remove('enter');
@@ -2312,17 +2538,20 @@ function applyLayout() {
   const vv = window.visualViewport;
   const vw = Math.round(vv?.width || window.innerWidth);
   const vh = Math.round(vv?.height || window.innerHeight);
-  let w = 410;
-  let ri = 12;
+  const insets = safeInsets();
+  const gutter = vw <= 560 ? 6 : 12;
+  const usableWidth = Math.max(1, vw - insets.l - insets.r - 2 * gutter);
+  const w = Math.min(usableWidth, vw <= 560 ? 410 : vw <= 1100 ? 460 : 410);
   let mt = 64;
   let mb = 88;
-  if (vw <= 560) { w = vw - 16; ri = 8; mt = 56; mb = 72; }
-  else if (vw <= 1100) { w = 460; mt = 56; mb = 72; }
+  if (vw <= 560) { mt = 12; mb = 12; }
+  else if (vw <= 1100) { mt = 56; mb = 72; }
   if (vh < 520) { mt = 8; mb = 8; }
   const st = panel.style;
   st.setProperty('--bc-vh', `${vh}px`);
   st.setProperty('--bc-w', `${w}px`);
-  st.setProperty('--bc-ri', `${ri}px`);
+  st.setProperty('--bc-left', `${(vv?.offsetLeft || 0) + vw - insets.r - gutter - w}px`);
+  st.setProperty('--bc-view-top', `${vv?.offsetTop || 0}px`);
   st.setProperty('--bc-mt', `${mt}px`);
   st.setProperty('--bc-mb', `${mb}px`);
 }
@@ -2477,18 +2706,34 @@ function loadSkinAssets(id) {
   }
 }
 
+const CHAT_PALETTE_KEYS = ['ac', 'ac2', 't1', 't2', 'pale', 'ink', 'deep', 'mu', 'rgb', 'drgb'];
+let readHostRegex;
+let chatSkinId;
+
+function syncChatRegex() {
+  const scripts = listRegex().map(row => row.s);
+  try {
+    // The host also exposes Regex scripts attached to the current preset.
+    if (readHostRegex) scripts.push(...readHostRegex({ allowedOnly: true }));
+  } catch (error) { console.warn('[Bot Console] preset Regex unavailable', error); }
+  try {
+    themeRegex(new Set(scripts));
+  } catch (error) { console.warn('[Bot Console] chat Regex palette failed', error); }
+}
+
 function applyChatSkin() {
   const id = premium() && skinById(cfg.skin) ? cfg.skin : 'default';
-  const p = uiPalette(id);
-  const de = document.documentElement;
-  if (p) {
-    de.dataset.bcSkin = id;
-    const set = { ac: p.ac, ac2: p.ac2, t1: p.t1, ink: p.ink, deep: p.deep, mu: p.mu, rgb: p.rgb };
-    for (const [k, v] of Object.entries(set)) de.style.setProperty(`--bcu-${k}`, v);
-  } else {
-    delete de.dataset.bcSkin;
+  if (chatSkinId === id) return;
+  chatSkinId = id;
+  const palette = uiPalette(id);
+  const root = document.documentElement;
+  if (palette) root.dataset.bcSkin = id;
+  else delete root.dataset.bcSkin;
+  for (const key of CHAT_PALETTE_KEYS) {
+    if (palette) root.style.setProperty('--bcu-' + key, palette[key]);
+    else root.style.removeProperty('--bcu-' + key);
   }
-  try { applyChatUi(p, id); } catch (e) { console.warn('[Bot Console] chat card recolor failed', e); }
+  syncChatRegex();
 }
 
 function applySkin() {
@@ -2499,6 +2744,7 @@ function applySkin() {
   if (fab) delete fab.dataset.skin;
   applyChatSkin();
   const custom = wallCustom();
+  panel?.classList.toggle('custom-wall', !!custom);
   const wall = custom ? `url("${custom}")` : meta?.wall ? `url("${THEMES_URL}${meta.wall}")` : '';
   if (!panel) return;
   if (wall) panel.style.setProperty('--bc-wall', wall);
@@ -2568,15 +2814,21 @@ function mountUi() {
   panel = document.createElement('div');
   panel.id = 'bc-panel';
   panel.innerHTML = `
-    <div class="bc-head"><button class="bc-ico bc-back" id="bc-back" data-act="home" title="กลับหน้าหลัก"><i class="fa-solid fa-chevron-left"></i></button><span class="bc-dot"></span><b id="bc-title">Seito's bot Console</b>
+    <div class="bc-head"><span class="bc-head-decoration" aria-hidden="true"></span><button class="bc-ico bc-back" id="bc-back" data-act="home" title="กลับหน้าหลัก"><i class="fa-solid fa-chevron-left"></i></button><span class="bc-dot"></span><b id="bc-title">Seito's bot Console</b>
       <button class="bc-ico" data-act="close" title="ปิด"><i class="fa-solid fa-xmark"></i></button></div>
-    <div id="bc-body"></div><button class="bc-homebar" data-act="home" title="หน้าหลัก"><i></i></button><div class="bc-scan"></div>`;
+    <div class="bc-mei-atmosphere bc-kiana-atmosphere bc-bronya-atmosphere" aria-hidden="true"></div>
+    <div id="bc-body"></div>
+    <nav class="bc-skin-dock" aria-label="สลับหน้า" hidden>${TABS.map(t =>
+      `<button type="button" data-tab="${t.id}" title="${esc(t.label)}" aria-label="${esc(t.label)}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i></button>`
+    ).join('')}</nav>
+    <button class="bc-homebar" data-act="home" title="หน้าหลัก"><i></i></button><div class="bc-scan"></div>`;
   document.body.appendChild(panel);
   mountNotify();
   escapeBodyContext();
   window.addEventListener('resize', layoutPanel);
   window.addEventListener('orientationchange', layoutPanel);
   window.visualViewport?.addEventListener('resize', layoutPanel);
+  window.visualViewport?.addEventListener('scroll', layoutPanel);
   window.addEventListener('pageshow', layoutPanel);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
@@ -2585,6 +2837,46 @@ function mountUi() {
   });
   applyLayout();
   applyCfg();
+
+  let skinRailDrag = null;
+  let skinDragSuppressUntil = 0;
+  panel.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const rail = e.target.closest('.bc-skins');
+    if (!rail) return;
+    skinRailDrag = { rail, pointerId: e.pointerId, startX: e.clientX, startScroll: rail.scrollLeft, moved: false, frame: 0, left: rail.scrollLeft };
+  });
+  window.addEventListener('pointermove', (e) => {
+    const dragState = skinRailDrag;
+    if (!dragState || dragState.pointerId !== e.pointerId) return;
+    const dx = e.clientX - dragState.startX;
+    if (!dragState.moved && Math.abs(dx) > 5) {
+      dragState.moved = true;
+      dragState.rail.classList.add('dragging');
+    }
+    if (!dragState.moved) return;
+    dragState.left = dragState.startScroll - dx;
+    if (!dragState.frame) {
+      dragState.frame = requestAnimationFrame(() => {
+        dragState.frame = 0;
+        dragState.rail.scrollLeft = dragState.left;
+      });
+    }
+    e.preventDefault();
+  });
+  const endSkinRailDrag = (e) => {
+    const dragState = skinRailDrag;
+    if (!dragState || (e && dragState.pointerId !== e.pointerId)) return;
+    if (dragState.frame) {
+      cancelAnimationFrame(dragState.frame);
+      dragState.rail.scrollLeft = dragState.left;
+    }
+    if (dragState.moved) skinDragSuppressUntil = performance.now() + 120;
+    dragState.rail.classList.remove('dragging');
+    skinRailDrag = null;
+  };
+  window.addEventListener('pointerup', endSkinRailDrag);
+  window.addEventListener('pointercancel', endSkinRailDrag);
 
   let drag = null;
   let dragRaf = 0;
@@ -2652,6 +2944,7 @@ function mountUi() {
 
   panel.addEventListener('input', (e) => {
     if (e.target?.id === 'bc-lic') {
+      licDraft = e.target.value;
       const button = panel.querySelector('[data-act="licApply"]');
       if (button && !licBusy) button.disabled = !String(e.target.value || '').trim();
       return;
@@ -2690,6 +2983,11 @@ function mountUi() {
   });
 
   panel.addEventListener('click', (e) => {
+    if (e.target.closest('.bc-skins') && performance.now() < skinDragSuppressUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const relCard = e.target.closest('.bc-rel[data-rel]');
     if (relCard && !e.target.closest('[data-act],[data-tab],[data-form],input,textarea,button,.bc-imgmenu,.bc-thought')) {
       toggleThought(relCard.dataset.rel);
@@ -2698,6 +2996,7 @@ function mountUi() {
     const t = e.target.closest('[data-act],[data-tab]');
     if (!t) return;
     if (t.dataset.tab) {
+      if (t.dataset.tab === tab) return;
       tab = t.dataset.tab; editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null; phoneForm = false; phoneSel = null; shopForm = null; missionForm = null; apptForm = null; giftFor = null;
       if (tab === 'phone' && phoneName) phoneStick = true;
       render();
@@ -2708,10 +3007,16 @@ function mountUi() {
       case 'close': setOpen(false); break;
       case 'home':
         editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null; phoneForm = false; phoneSel = null; shopForm = null; missionForm = null; apptForm = null; giftFor = null;
-        tab = 'home';
+        tab = tab === 'bag' ? 'player' : tab === 'decorations' ? 'shop' : 'home';
         render();
         break;
       case 'licApply': applyLicense(); break;
+      case 'settingsSection':
+        settingsSection = t.dataset.id;
+        render();
+        break;
+      case 'checkUpdate': updater.open(); break;
+      case 'botUpdate': botUpdater.open(); break;
       case 'fabReset':
         fabPos = { x: 1, y: 0.4 };
         cfg.size = CFG_DEFAULT.size;
@@ -3169,7 +3474,37 @@ function mountUi() {
 function bindEvents() {
   const c = ctx();
   const et = c.eventTypes || c.event_types || {};
-  ['CHAT_CHANGED', 'MESSAGE_RECEIVED', 'MESSAGE_EDITED', 'MESSAGE_DELETED', 'MESSAGE_SWIPED', 'MESSAGE_UPDATED', 'GENERATION_ENDED', 'CHARACTER_EDITED']
+  for (const event of [et.CHAT_CHANGED, et.CHARACTER_EDITED]) {
+    if (event) c.eventSource.on(event, () => {
+      syncChatRegex();
+      themeVisibleCards(document.getElementById('chat'));
+    });
+  }
+  if (et.GENERATION_STARTED) c.eventSource.on(et.GENERATION_STARTED, (type) => {
+    syncChatRegex();
+    generationType = type || 'normal';
+    const last = ctx().chat?.at(-1);
+    replacedReply = ['regenerate', 'swipe'].includes(type) && !last?.is_user && !last?.is_system ? last : null;
+    if (ctx().chatMetadata !== lastMd || !cur) rebuild();
+    applyTurnPrompt(quietTasks > 0);
+    applyShopCtx(quietTasks > 0);
+  });
+  if (et.MESSAGE_SENT) c.eventSource.on(et.MESSAGE_SENT, (id) => {
+    const msg = ctx().chat?.[id];
+    if (!msg?.is_user || msg.is_system || !resolveProfile()) return;
+    (msg.extra ||= {}).bcBagTurn = true;
+    applyTurnPrompt(quietTasks > 0);
+  });
+  if (et.GENERATION_ENDED) c.eventSource.on(et.GENERATION_ENDED, () => {
+    generationType = '';
+    replacedReply = null;
+  });
+  if (et.MESSAGE_RECEIVED) c.eventSource.on(et.MESSAGE_RECEIVED, (id, type) => {
+    const msg = ctx().chat?.[id];
+    if (msg?.mes?.trim() && !msg.is_user && !msg.is_system &&
+        ['normal', 'group_chat', undefined].includes(type ?? (generationType || undefined))) awardActivity(Number(id));
+  });
+  ['CHAT_CHANGED', 'MESSAGE_SENT', 'MESSAGE_RECEIVED', 'MESSAGE_EDITED', 'MESSAGE_DELETED', 'MESSAGE_SWIPED', 'MESSAGE_UPDATED', 'GENERATION_ENDED', 'CHARACTER_EDITED']
     .forEach((n) => { if (et[n]) c.eventSource.on(et[n], refresh); });
   ['MESSAGE_RECEIVED', 'GENERATION_ENDED'].forEach((n) => { if (et[n]) c.eventSource.on(et[n], maybeAuto); });
   document.addEventListener('click', (e) => {
@@ -3182,12 +3517,30 @@ jQuery(() => {
     console.error('[Bot Console] SillyTavern.getContext() not found - SillyTavern is too old.');
     return;
   }
+  progressStore = createProgressStore(ctx().getRequestHeaders?.(), () => {
+    if (panel) panel.dataset.decoration = progressStore.get().equipped;
+    if (open && ['settings', 'decorations'].includes(tab) && !formOpen()) render();
+  });
+  const showUpdateSettings = () => { if (open && tab === 'settings' && settingsSection === 'system') render(); };
+  updater = createUpdater(ctx, showUpdateSettings);
+  botUpdater = createBotUpdater(ctx, showUpdateSettings, isGenerating);
   mountUi();
+  panel.dataset.decoration = progressStore.get().equipped;
   bindEvents();
+  setTimeout(() => void updater.check(), 3000);
+  setTimeout(() => void botUpdater.check(), 4000);
+  const eventTypes = ctx().eventTypes || ctx().event_types || {};
+  for (const event of [eventTypes.CHAT_CHANGED, eventTypes.CHARACTER_EDITED, eventTypes.GENERATION_ENDED]) {
+    if (event) ctx().eventSource.on(event, () => { void botUpdater.check(); });
+  }
   refresh();
   mountApiDrawer();
   applySkin();
-  watchChat(applyChatSkin);
+  themeVisibleCards(document.getElementById('chat'));
+  void import('/scripts/extensions/regex/engine.js').then(module => {
+    readHostRegex = module.getRegexScripts;
+    syncChatRegex();
+  }).catch(() => { /* Use the Regex lists exposed by older SillyTavern versions. */ });
   initMemory();
   void setLicense(extSlot().license).then(async (valid) => {
     if (!valid) return;
