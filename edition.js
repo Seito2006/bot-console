@@ -40,13 +40,10 @@ async function subtleKey(kid) {
   try { return await verifierCache.get(kid); } catch { return null; }
 }
 
-// WebCrypto first. Browsers without Ed25519 in WebCrypto (older Android Chrome / WebView) or pages
-// served over plain http (no crypto.subtle) fall back to the bundled pure-JS verifier, which checks
-// the very same signature against the very same public key.
 async function signatureValid(kid, message, signature) {
   const key = await subtleKey(kid);
   if (key) {
-    try { return await crypto.subtle.verify({ name: 'Ed25519' }, key, signature, message); } catch { /* fall through */ }
+    try { return await crypto.subtle.verify({ name: 'Ed25519' }, key, signature, message); } catch {   }
   }
   const raw = rawPublicKey(kid);
   return !!raw && verifyEd25519(raw, signature, message);
@@ -55,10 +52,6 @@ async function signatureValid(kid, message, signature) {
 let lastReason = '';
 export const licenseReason = () => lastReason;
 
-// Signed license format: BC1.<base64url-payload>.<base64url-Ed25519-signature>
-// The signature covers the exact text "BC1.<base64url-payload>".
-// Returns { key, reason }: key is the normalised license text when valid, otherwise '' and a reason
-// ('empty' | 'format' | 'clock' | 'expired' | 'signature').
 export async function checkKey(raw) {
   const value = String(raw ?? '').replace(/\s+/g, '');
   if (!value) return { key: '', reason: 'empty' };

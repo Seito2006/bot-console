@@ -22,8 +22,6 @@ const bulky = /^(?:เสื้อ|ชุด(?:เกราะ|นักเร�
 const simpleName = (s) => s.length <= 80 && !/[!?？“”"<>|]|หรือ|ถ้า|แล้ว|เพราะ|เพื่อ|จาก|ให้|ไหม|จะ|ไม่ได้|และ|เอาไว้|วาง/u.test(s);
 
 function storageObject(action) {
-  // "เก็บ" alone can also mean picking something up. Require a storage
-  // destination or an explicit "เอา ... ไปเก็บ" action.
   const move = /^(?:เอา|นำ)\s*(.*?)\s*ไปเก็บ\s*(.*)$/u.exec(action);
   if (/(?:ไปเก็บ|^เก็บ.*?)\s*(?:ไว้ใน|เข้า|ใส่|ใน|ที่|ไว้)\s*(?:กระเป๋า|เป้)/u.test(action)) return null;
   if (move) {
@@ -35,8 +33,6 @@ function storageObject(action) {
   return put?.[1] ?? null;
 }
 
-// Only project unambiguous player declarations immediately. The main generation
-// interprets free-form prose, including subjects, intent and transfers in dialogue.
 function declaredItems(text, ids, inv, held, names) {
   const out = [];
   for (const line of String(text).split(/\r?\n/)) {
@@ -107,8 +103,6 @@ function eventsOf(msg) {
   return events;
 }
 
-// Replay the active replies and manual transactions over the pre-upgrade bag.
-// A swipe thus replaces its effects without undoing unrelated shop purchases.
 export function readTurns(chat, shop, catalog, { beforeReply = false } = {}) {
   const inv = Object.assign(Object.create(null), shop.inv);
   const held = Object.create(null);
@@ -164,8 +158,6 @@ export function readTurns(chat, shop, catalog, { beforeReply = false } = {}) {
       for (const e of declared) {
         const hit = reported.find(r => !matched.has(r) && norm(r.name) === norm(e.name) &&
           (r.type === e.type || (['carry', 'receive'].includes(r.type) && ['carry', 'receive'].includes(e.type))));
-        // Once confirmed, respect the order in the story unless a console
-        // transaction has already used the player's provisional balance.
         if (hit && !(changes[j]?.at <= next)) continue;
         if (hit) matched.add(hit);
         itemChange(hit || e);
@@ -188,7 +180,6 @@ export function readTurns(chat, shop, catalog, { beforeReply = false } = {}) {
   return { inv, held, names, messages };
 }
 
-// Keep receipts separately from the inbox: a user may edit or clear a delivered text.
 export function syncTurnTexts(phone, messages, { contact, visible, stamp, incoming }) {
   const receipts = phone.turnReceipts || {};
   let changed = false;

@@ -308,7 +308,6 @@
 #bc-panel[data-skin="kiana"] .bc-ai { width: 62px; height: 62px; font-size: 23px; color: #fff; background: linear-gradient(160deg, var(--bc-hot), var(--bc-accent) 55%, var(--bc-accent2)); }
 #bc-panel[data-skin="kiana"] .bc-al { font-weight: 600; font-size: 12px; }
 
-
 #bc-panel[data-skin="theresa"] .bc-widget {
   width: 156px; height: 156px; margin: 4px auto 2px; padding: 0; flex-direction: column; justify-content: center; gap: 4px; text-align: center;
   border-radius: 50%; border: 3px double var(--bc-line); box-shadow: 0 0 34px var(--bc-glow), inset 0 0 22px var(--bc-ghost);
@@ -339,7 +338,6 @@
 #bc-panel[data-skin="sentience"] .bc-al { flex: 1; text-align: left; font-size: 13px; letter-spacing: .06em; text-shadow: none; }
 #bc-panel[data-skin="sentience"] .bc-app .bc-badge { right: 34px; top: 50%; margin-top: -9px; }
 
-/* Valkyrie Status card (.hs) follows the skin; the element accent (--ac per data-e) is left alone */
 html[data-bc-skin] body .hs {
   --ink: var(--bcu-ink); --deep: var(--bcu-deep); --mu: var(--bcu-mu); --ln: rgba(var(--bcu-rgb), .3);
   filter: none;
@@ -351,7 +349,6 @@ html[data-bc-skin] body .hs .hs-top { background: linear-gradient(90deg, var(--a
 html[data-bc-skin] body .hs .hs-mini { background: rgba(var(--bcu-rgb), .18); }
 html[data-bc-skin] body .hs .hs-bar i { background: rgba(var(--bcu-rgb), .14); }
 
-/* Raiden Mei · Xentinel — refined indigo, jade and gold premium interface */
 #bc-panel[data-skin="mei"],
 #bc-fab[data-skin="mei"],
 #bc-notify[data-skin="mei"],
@@ -524,7 +521,6 @@ html[data-bc-skin] body .hs .hs-bar i { background: rgba(var(--bcu-rgb), .14); }
   #bc-panel[data-skin="mei"] *, #bc-panel[data-skin="mei"] *::before, #bc-panel[data-skin="mei"] *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
-/* Raiden Mei · Herrscher of Origin — purple silk, sakura, and stormglass */
 #bc-panel[data-skin="mei"], #bc-notify[data-skin="mei"], #bc-api-drawer[data-skin="mei"],
 #bc-fab[data-skin="mei"], html[data-bc-skin="mei"] #bc-fab {
   --bc-font: 'Sarabun', 'Chakra Petch', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Marcellus', 'Trirong', serif;
@@ -573,7 +569,6 @@ html[data-bc-skin="mei"] #bc-fab[data-theme="light"] {
 #bc-panel[data-skin="mei"][data-theme="light"] .bc-homebar { background: #eee4fa; }
 #bc-panel[data-skin="mei"] .bc-homebar i { background: linear-gradient(90deg,#b58bff,#64d5e6); }
 
-/* Shared page language: framed silk cards, luminous labels, thin ink details */
 #bc-panel[data-skin="mei"] .bc-sec { position: relative; gap: 9px; margin: 19px 0 10px; padding: 0 1px 7px 2px; border-bottom: 1px solid rgba(208,165,255,.18); font-family: var(--bc-font-head); letter-spacing: .045em; }
 #bc-panel[data-skin="mei"] .bc-sec:first-child { margin-top: 3px; }
 #bc-panel[data-skin="mei"] .bc-sec::before { width: 6px; height: 15px; border-radius: 1px 5px 1px 5px; transform: skewY(-20deg); background: linear-gradient(180deg,#ffe3a4,#b58bff 58%,#64d5e6); box-shadow: 0 0 9px rgba(181,139,255,.28); }
@@ -609,7 +604,6 @@ html[data-bc-skin="mei"] #bc-fab[data-theme="light"] {
 #bc-panel[data-skin="mei"] :is(button,input,select,textarea):focus-visible { outline: 2px solid var(--bc-hot); outline-offset: 2px; }
 #bc-panel[data-skin="mei"] #bc-body::-webkit-scrollbar-thumb { border-radius: 9px; background: linear-gradient(#b58bff,#64d5e6); }
 
-/* Mei home: a quiet celestial dial, with no character-purchase hero card */
 #bc-panel[data-skin="mei"] .bc-home { gap: 13px; }
 #bc-panel[data-skin="mei"] .bc-status { min-height: 23px; padding: 0 3px 7px; border-bottom: 1px solid rgba(208,165,255,.2); font-size: 9px; letter-spacing: .13em; }
 #bc-panel[data-skin="mei"] .bc-sti { color: #71d7e6; }
@@ -641,7 +635,6 @@ html[data-bc-skin="mei"] #bc-fab[data-theme="light"] {
 #bc-panel[data-skin="mei"] .bc-app:nth-child(4n) .bc-ai { border-color: rgba(255,227,164,.62); }
 #bc-panel[data-skin="mei"] .bc-app .bc-badge { top: -5px; right: calc(50% - 34px); box-shadow: 0 0 0 2px #211638; }
 
-/* Player, bonds, shop, missions, appointments, messages, regex controls, and settings */
 #bc-panel[data-skin="mei"] .bc-hero { border-radius: 20px 5px 20px 5px; border-color: rgba(255,227,164,.25); background: linear-gradient(115deg,rgba(65,43,99,.76),rgba(28,20,49,.72)); }
 #bc-panel[data-skin="mei"] .bc-port { background: linear-gradient(145deg,#ffe3a4,#b58bff 55%,#64d5e6); filter: drop-shadow(0 5px 10px rgba(9,5,22,.28)); }
 #bc-panel[data-skin="mei"] .bc-port-in { background: #211638; }
@@ -721,7 +714,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
   #bc-panel[data-skin="mei"] .bc-skin { min-height: 178px; }
 }
 
-/* Final polish: clear the header, center the crest, and keep the send area unobstructed. */
 #bc-panel[data-skin="mei"]::before { display: none !important; }
 #bc-panel[data-skin="mei"] .bc-head .bc-back {
   position: relative; z-index: 5; display: grid; place-items: center; width: 40px; height: 40px; min-width: 40px; min-height: 40px;
@@ -740,7 +732,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
 #bc-panel[data-skin="mei"][data-theme="light"] .bc-dot::before { background: #38244e; }
 #bc-panel[data-skin="mei"] .bc-mei-console::before { display: none !important; }
 
-/* A compact WuWa-style portrait rail, shared by every skin. */
 #bc-panel[data-skin="mei"] .bc-skins {
   display: flex; grid-template-columns: none; align-items: stretch; gap: 10px; height: clamp(220px,40vh,300px); padding: 4px 3px 11px;
   overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; scroll-snap-type: none;
@@ -795,7 +786,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
   #bc-panel[data-skin="mei"] .bc-skin { flex-basis: 104px; width: 104px; min-height: 0; }
 }
 
-/* Kiana · Ba-Dum!: playful star-pop details in ivory, cherry red, and wine. */
 #bc-panel[data-skin="kiana"], #bc-fab[data-skin="kiana"], #bc-notify[data-skin="kiana"], #bc-api-drawer[data-skin="kiana"] {
   --bc-font: 'Prompt', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Kanit', 'Prompt', sans-serif;
   --bc-hexp: inset(0 round 27%); --bc-rp: 22px 5px 22px 5px; --bc-r: 12px; --bc-br: 4px 13px 4px 13px;
@@ -902,7 +892,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
 #bc-panel[data-skin="kiana"] .bc-kiana-deck .bc-app::after { content: ''; justify-self: end; width: 10px; height: 16px; background: linear-gradient(180deg, var(--bc-hot), var(--bc-accent)); mask: url('themes/kiana/cat-paw-cc0.svg') center / contain no-repeat; -webkit-mask: url('themes/kiana/cat-paw-cc0.svg') center / contain no-repeat; }
 #bc-panel[data-skin="kiana"] .bc-kiana-deck .bc-badge { position: absolute; z-index: 3; top: 4px; right: 5px; }
 
-/* Ba-Dum color and component styling carried through every tab and roleplay chat. */
 #bc-panel[data-skin="kiana"] .bc-card, #bc-panel[data-skin="kiana"] .bc-row, #bc-panel[data-skin="kiana"] .bc-tile,
 #bc-panel[data-skin="kiana"] .bc-skill, #bc-panel[data-skin="kiana"] .bc-widget, #bc-panel[data-skin="kiana"] .bc-hero {
   border-color: rgba(241, 137, 158, .24); border-radius: 5px 15px 5px 15px;
@@ -972,7 +961,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
   #bc-panel[data-skin="kiana"] .bc-kiana-deck .bc-ai { width: 35px; height: 35px; }
 }
 
-/* Bronya · Heart of the Night: silver orchid details over a quiet cyber atelier. */
 #bc-panel[data-skin="bronya"], #bc-fab[data-skin="bronya"], #bc-notify[data-skin="bronya"], #bc-api-drawer[data-skin="bronya"] {
   --bc-font: 'Niramit', 'Noto Sans Thai', sans-serif; --bc-font-head: 'Josefin Sans', 'Niramit', sans-serif;
   --bc-hexp: polygon(50% 0, 92% 18%, 100% 50%, 80% 90%, 50% 100%, 20% 90%, 0 50%, 8% 18%);
@@ -1036,7 +1024,7 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
 }
 #bc-panel[data-skin="bronya"][data-theme="light"] .bc-bronya-atmosphere::before { opacity: .045; }
 #bc-panel[data-skin="bronya"][data-theme="light"] .bc-bronya-atmosphere::after { opacity: .07; }
-/* One orbital instrument holds both the in-world time and the eight destinations. */
+
 #bc-panel[data-skin="bronya"].at-home .bc-back { display: none; }
 #bc-panel[data-skin="bronya"] .bronya-home {
   --dial-line: color-mix(in srgb, var(--bc-accent2) 36%, transparent);
@@ -1272,7 +1260,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
 #bc-panel[data-skin="bronya"] .bc-homebar i { background: linear-gradient(90deg, var(--bc-accent), var(--bc-accent2)); }
 #bc-notify[data-skin="bronya"] { border-color: rgba(190,162,220,.36); border-radius: 6px 16px 6px 16px; }
 
-/* Ba-Dum! gets a bright pop palette and circular launcher, separate from Bronya's vertical terminal. */
 #bc-panel[data-skin="kiana"], #bc-fab[data-skin="kiana"], #bc-notify[data-skin="kiana"], #bc-api-drawer[data-skin="kiana"] {
   --bc-bg: rgba(20, 10, 15, .97); --bc-bg2: #29171e; --bc-card: rgba(61, 29, 39, .8);
   --bc-ink: #fff6f7; --bc-dim: #d4aab3; --bc-line: rgba(255, 128, 151, .3);
@@ -1353,8 +1340,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
   #bc-panel[data-skin="kiana"] .bc-kiana-deck .bc-al { font-size: 8px; }
 }
 
-
-/* Keep the floating console launcher bright across every theme, including the default skin. */
 #bc-fab .bc-hex, html[data-bc-skin] #bc-fab .bc-hex {
   border-color: var(--bc-accent2); background: linear-gradient(145deg, var(--bc-accent2), var(--bc-accent));
   overflow: hidden;
@@ -1364,7 +1349,6 @@ html[data-bc-skin="mei"] #bc-fab .bc-hex::after { content: ''; position: absolut
 }
 #bc-fab .bc-hex > i { color: #fff; }
 
-/* The launcher belongs to the document root, including when the panel is closed. */
 html[data-bc-skin="kiana"] #bc-fab .bc-hex {
   border: 0;
   border-radius: 50%;
@@ -1397,7 +1381,6 @@ html[data-bc-skin="bronya"] #bc-fab .bc-hex::after {
 }
 html:is([data-bc-skin="kiana"], [data-bc-skin="bronya"]) #bc-fab .bc-hex > :is(img, i) { display: none; }
 
-/* Lunar Vow: silhouettes flank the moon dial, clear of controls. */
 #bc-panel[data-skin="theresa"] .bc-widget { position: relative; }
 #bc-panel[data-skin="theresa"] .bc-widget::before,
 #bc-panel[data-skin="theresa"] .bc-widget::after {
@@ -1426,7 +1409,6 @@ html:is([data-bc-skin="kiana"], [data-bc-skin="bronya"]) #bc-fab .bc-hex > :is(i
   mask: url("themes/decor/lunar-bats.svg") center / contain no-repeat;
 }
 
-/* Lunar Vow — a wine velvet cover facing a bound index. */
 html[data-bc-skin="theresa"] #bc-fab .bc-hex {
   clip-path: polygon(50% 0, 89% 15%, 96% 56%, 74% 85%, 50% 100%, 26% 85%, 4% 56%, 11% 15%);
   background: linear-gradient(150deg,#ffe7cf,#ba7889 44%,#f7cfad 78%,#85455a);
@@ -1515,7 +1497,6 @@ html[data-bc-skin="theresa"] #bc-fab .bc-hex::after {
 #bc-panel[data-skin="theresa"] .bc-skin.on { border-color: var(--lv-foil); box-shadow: 0 0 0 1px var(--lv-foil); }
 #bc-panel[data-skin="theresa"] :is(button,input,textarea,select):focus-visible { outline: 2px solid var(--lv-foil); outline-offset: -2px; }
 
-/* Keep the portrait visible through the book, with denser surfaces under copy. */
 #bc-panel[data-skin="theresa"].has-wall {
   --bc-veilx: linear-gradient(160deg,rgba(21,6,14,.30),rgba(21,6,14,.58));
   --lv-cover: rgba(58,16,36,.74); --lv-paper: rgba(36,15,28,.81);
@@ -1525,7 +1506,6 @@ html[data-bc-skin="theresa"] #bc-fab .bc-hex::after {
   --lv-cover: rgba(250,220,228,.79); --lv-paper: rgba(255,249,245,.85);
 }
 
-/* Fenghuang: a sunset above a bank of feather-shaped keys. */
 #bc-panel[data-skin="fenghuang"] {
   --hua-surface: #35231fec; --hua-trim: #efbd76; --hua-edge: #975936;
   --bc-veilx: linear-gradient(165deg,#26172559,#271620bd);
@@ -1559,7 +1539,6 @@ html[data-bc-skin="theresa"] #bc-fab .bc-hex::after {
 #bc-panel .phoenix-feathers .bc-al { white-space: normal; overflow-wrap: anywhere; font-size: 12px; text-shadow: none; }
 #bc-panel .phoenix-feathers .bc-badge { top: 1px; right: 1px; background: #9d301d; }
 
-/* Sentience: a vertical title strip and a single column of ink strokes. */
 #bc-panel[data-skin="sentience"] {
   --hua-surface: #182432ed; --hua-trim: #e6c897; --hua-edge: #907660;
   --bc-veilx: linear-gradient(100deg,#15202b50,#101b28c2);
@@ -1586,7 +1565,6 @@ html[data-bc-skin="theresa"] #bc-fab .bc-hex::after {
 #bc-panel[data-skin="sentience"] .ink-index .bc-ai { width: 30px; height: 30px; border-radius: 50%; clip-path: none; color: var(--hua-trim); background: transparent; border: 1px solid var(--hua-edge); }
 #bc-panel .ink-index .bc-al { white-space: normal; }
 
-/* Carry each skin's materials through secondary pages, inputs and messages. */
 #bc-panel[data-skin="fenghuang"] :is(.bc-card,.bc-tile,.bc-skill,.bc-row,.bcp-row) {
   background: var(--hua-surface); border: 1px solid var(--hua-edge); border-radius: 20px 4px;
 }
@@ -1613,7 +1591,6 @@ html:is([data-bc-skin="fenghuang"],[data-bc-skin="sentience"]) #bc-fab .bc-hex >
 html[data-bc-skin="fenghuang"] #bc-fab .bc-hex::after { content: ""; position: absolute; inset: 18%; background: #49200e; mask: url("themes/decor/fenghuang.svg") center / contain no-repeat; }
 html[data-bc-skin="sentience"] #bc-fab .bc-hex::after { content: ""; position: absolute; inset: 16%; background: #efd5ae; mask: url("themes/decor/ink-circle.svg") center / contain no-repeat; }
 
-/* A separate cover composition for each collection, using the original wallpaper. */
 #bc-panel .folio-place { margin: 2px 0; padding: 8px 12px; font-size: 12px; text-align: center; background: var(--bc-card); color: var(--bc-ink); overflow-wrap: anywhere; }
 #bc-panel .mei-dawn { position: relative; display: grid; justify-items: center; padding: 14px 0 3px; }
 #bc-panel .mei-halo {
@@ -1663,7 +1640,6 @@ html[data-bc-skin="sentience"] #bc-fab .bc-hex::after { content: ""; position: a
 #bc-panel .pop-stage .bc-al { color: var(--bc-ink); white-space: normal; text-shadow: none; }
 #bc-panel .pop-stage .bc-app .bc-badge { right: 4px; top: 2px; }
 
-/* A narrow illuminated spine and a translucent page leave Luna's portrait in view. */
 #bc-panel .lunar-book { align-content: end; padding-top: 60px; }
 #bc-panel .lunar-cover { border-radius: 65px 4px 0 10px; box-shadow: inset 4px 0 var(--lv-rule),inset 7px 0 var(--lv-cover); }
 #bc-panel .lunar-cover h2 { font-style: italic; }
@@ -1701,7 +1677,6 @@ html[data-bc-skin="sentience"] #bc-fab .bc-hex::after { content: ""; position: a
 #bc-panel[data-skin="sentience"] .bc-skin-dock button[aria-current] { border-inline-start: 3px solid #c94c60; color: var(--hua-trim); }
 #bc-panel:is([data-skin="mei"],[data-skin="kiana"]).at-home .bc-head .bc-back { display: none; }
 
-/* Home plates retain their outlines, while the illustration shows through. */
 #bc-panel.at-home.has-wall[data-skin] .bc-home :is(.mei-halo,.mei-dawn h2,.pop-ticket,.pop-stub,.bc-night-time,.lunar-cover,.lunar-index,.ink-spine,.ink-date,.hua-place,.folio-place) {
   background: var(--home-plate); color: var(--home-text);
 }
@@ -1726,7 +1701,6 @@ html[data-bc-skin="fenghuang"] #bc-fab .bc-hex {
 }
 html[data-bc-skin="fenghuang"] #bc-fab .bc-hex::after { inset: 13%; background: #522014; }
 
-/* Seele: pearl, midnight indigo and pale aqua. */
 :is(#bc-panel,#bc-notify,#bc-api-drawer)[data-skin="seele"] {
   --bc-font: 'Sarabun',sans-serif; --bc-font-head: 'Marcellus','Sarabun',serif;
   --bc-bg: #171b32; --bc-bg2: #252840; --bc-card: #2e304be8; --bc-line: #707698;
@@ -1768,7 +1742,6 @@ html[data-bc-skin="seele"] #bc-fab .bc-hex::before { content: none; }
 html[data-bc-skin="seele"] #bc-fab .bc-hex > :is(img,i) { display: none; }
 html[data-bc-skin="seele"] #bc-fab .bc-hex::after { content: ""; position: absolute; inset: 16%; background: #dfeef9; }
 
-/* Narrow panels: keep names intact and use the same foreground as the home controls. */
 #bc-panel.at-home.has-wall[data-skin="fenghuang"] #bc-body > .bc-home { --portrait-space: 80cqw; }
 #bc-panel.at-home.has-wall[data-theme="light"] .phoenix-sky { color: var(--home-text); background: var(--home-plate); }
 #bc-panel.at-home.has-wall .pop-ticket h2 { font-size: clamp(23px,9cqw,36px); white-space: nowrap; }
@@ -1776,7 +1749,6 @@ html[data-bc-skin="seele"] #bc-fab .bc-hex::after { content: ""; position: absol
 #bc-panel.at-home.has-wall .lunar-cover h2 { font-size: clamp(19px,6.3cqw,30px); overflow-wrap: normal; }
 #bc-panel.at-home.has-wall:is([data-skin="mei"],[data-skin="kiana"])::after { display: none; }
 
-/* Paint Mei's portrait to the full scrollable cover, including the location line. */
 #bc-panel.at-home.has-wall[data-skin="mei"]:not(.custom-wall) #bc-body > .mei-home {
   background-size: auto, cover, auto;
   background-position: center, center top, center;

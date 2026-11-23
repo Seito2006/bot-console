@@ -133,7 +133,7 @@ export function createUpdater(context, onChange) {
       return;
     }
     const from = version;
-    try { version = (await releaseFile('./manifest.json')).version || version; } catch { /* Use the cached version when the new manifest is unavailable. */ }
+    try { version = (await releaseFile('./manifest.json')).version || version; } catch {   }
     await renderLog(installedLog, { from: compareVersions(version, from) > 0 ? from : '', through: version });
     installedLog.hidden = false;
     notesPending = true;

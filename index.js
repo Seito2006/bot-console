@@ -16,6 +16,7 @@ import { themeRegex, themeVisibleCards } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
 import { DEFAULT_SHOP, rewardAmount, toMoney, fmtMoney, ensureShop, catalog, newItemId, tryBuy, shopContextBlock } from './shop.js';
 
+import { createSyncedDoc, emptyPrefs, mergePrefs, prefValue, setPref, uploadFile, deleteFile, serverFileUrl, accountHandle } from './sync.js';
 import { createProgressStore, grantActivity, accountLevel, missionExp, XP_PER_LEVEL, POINTS_PER_LEVEL } from './progress.js';
 import { createUpdater } from './updates.js';
 import { createBotUpdater } from './bot-update.js';
@@ -26,7 +27,7 @@ const CFG_KEY = 'bc_settings';
 const POS_KEY = 'bc_fab_pos';
 const ICON_URL = new URL('./icon.jpg', import.meta.url).href;
 const THEMES_URL = new URL('./themes/', import.meta.url).href;
-const SKINS_CSS = new URL('./skins.css?v=turn-sync-1', import.meta.url).href;
+const SKINS_CSS = new URL('./skins.css?v=2.0.1', import.meta.url).href;
 const TABS = [
   { id: 'player', label: 'ผู้เล่น', icon: 'fa-user' },
   { id: 'rel', label: 'ความสัมพันธ์', icon: 'fa-heart' },
@@ -142,7 +143,6 @@ async function saveNow() {
 const toast = (kind, msg) => { try { toastr[kind](msg); } catch { } };
 const formOpen = () => editing !== null || skillForm !== null || relForm !== null || urlFor !== null || phoneForm || shopForm !== null || missionForm !== null || apptForm !== null || giftFor !== null;
 
-// Why the console is (not) showing in the current chat: 'ok' | 'nochat' | 'name'
 function visibilityState() {
   if (!hasChat()) return 'nochat';
   if (REQUIRED_NAME && extSlot().showAll !== true && !hasName(ctx(), REQUIRED_NAME)) return 'name';
@@ -1717,7 +1717,7 @@ function accountCard() {
   const { xp, points } = progressStore.get();
   const step = xp % XP_PER_LEVEL;
   return `<section class="bc-card bc-account"><div class="bc-line">
-    <div><div class="bc-h">บัญชีในเครื่อง</div><b class="bc-account-level">เลเวล ${accountLevel(xp)}</b></div>
+    <div><div class="bc-h">บัญชี${progressStore.isOnline() ? ' · ซิงค์กับเซิร์ฟเวอร์แล้ว' : ' · ออฟไลน์ (จะซิงค์เมื่อเชื่อมต่อได้)'}</div><b class="bc-account-level">เลเวล ${accountLevel(xp)}</b></div>
     <b class="bc-account-points"><i class="fa-solid fa-gem" aria-hidden="true"></i> ${fmtMoney(points)} Point</b></div>
     <progress class="bc-account-xp" aria-label="ความคืบหน้าเลเวลบัญชี" value="${step}" max="${XP_PER_LEVEL}"></progress>
     <div class="bc-line"><span class="bc-dim">${step} / ${XP_PER_LEVEL} EXP</span>
@@ -2211,10 +2211,6 @@ async function applyLicense() {
   }
 }
 
-// The license lives in SillyTavern's per-user settings on the server. SillyTavern pages keep their own
-// in-memory copy and write it all back on every save, so a page that was open before the key was
-// entered elsewhere would later erase it for everybody. Reading the server copy again when the page
-// comes back to the foreground adopts a newer key, and puts ours back if another page wiped it.
 let licSyncAt = 0;
 async function syncLicense() {
   if (licBusy || Date.now() - licSyncAt < 60000) return;
@@ -2252,7 +2248,7 @@ function skinCardHtml() {
     .concat(SKINS.map((k) => tile(k.id, k.title, k.who, k.wall, premium() && active === k.id, !premium())));
   return `<div class="bc-card"><div class="bc-line"><div class="bc-h">สกินตัวละคร</div><span class="bc-ed${premium() ? '' : ' free'}">${premium() ? 'Premium' : 'Free'}</span></div>
       <div class="bc-skins">${tiles.join('')}</div></div>
-    <div class="bc-card"><div class="bc-h">วอลเปเปอร์</div>
+    <div class="bc-card"><div class="bc-h">วอลเปเปอร์ของธีมนี้</div>
       <div class="bc-wallprev">${wallCustom() || (premium() && cfg.skin !== 'default') ? '' : 'ยังไม่มีวอลเปเปอร์'}</div>
       <div class="bc-seg"><button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallPick"${premium() ? '' : ' disabled'}><i class="fa-solid fa-image"></i>เลือกรูป</button>
         <button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallClear"${premium() ? '' : ' disabled'}><i class="fa-solid fa-rotate-left"></i>ใช้ของสกิน</button></div>
@@ -2278,6 +2274,7 @@ function consoleSettings() {
         <input type="range" min="0" max="70" step="5" value="${cfg.transparent}" data-cfg="transparent"></div>
       <button class="bc-segb" data-act="fabReset"><i class="fa-solid fa-arrows-to-dot"></i>รีเซ็ตตำแหน่งและขนาดปุ่ม</button></div>
     <div class="bc-card"><div class="bc-h">ซิงค์ข้อมูล</div>
+      <button class="bc-segb" data-act="syncServer"><i class="fa-solid fa-cloud-arrow-down"></i>ซิงค์แต้ม/ตั้งค่ากับเซิร์ฟเวอร์</button>
       <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>`;
 }
 
@@ -2686,7 +2683,121 @@ const extSlot = () => {
   const all = ctx().extensionSettings;
   return all[EXT_ID] || (all[EXT_ID] = {});
 };
-const wallCustom = () => (premium() && typeof extSlot().wall === 'string' ? extSlot().wall : '');
+const SYNC_CFG = ['theme', 'skin', 'transparent'];
+const LOCAL_WALL = 'bc_wall_local:';
+let prefs;
+let prefsDirty = false;
+let pushTimer = 0;
+
+const activeSkin = () => (premium() && skinById(cfg.skin) ? cfg.skin : 'default');
+const wallVersion = id => (prefs ? prefValue(prefs.get(), 'wall.' + id, '') : '');
+
+function wallFor(id) {
+  if (!premium()) return '';
+  try {
+    const local = localStorage.getItem(LOCAL_WALL + id);
+    if (local) return local;
+  } catch { }
+  const version = wallVersion(id);
+  return version ? serverFileUrl(`bc_wall_${id}_${version}.jpg`) : '';
+}
+const wallCustom = () => wallFor(activeSkin());
+
+function pullPrefs() {
+  if (!prefs) return false;
+  const doc = prefs.get();
+  let changed = false;
+  for (const key of SYNC_CFG) {
+    if (prefsDirty) break;
+    let value = prefValue(doc, key, undefined);
+    if (value === undefined) continue;
+    if (key === 'theme') value = value === 'light' ? 'light' : 'dark';
+    else if (key === 'skin') value = skinById(value) ? value : 'default';
+    else value = clampN(Number(value) || 0, 0, 70);
+    if (cfg[key] !== value) { cfg[key] = value; changed = true; }
+  }
+  return changed;
+}
+
+function pushPrefs(delay = 500) {
+  prefsDirty = true;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    if (prefs) {
+      await prefs.update(doc => {
+        let any = false;
+        for (const key of SYNC_CFG) {
+          if (prefValue(doc, key, undefined) !== cfg[key]) { setPref(doc, key, cfg[key]); any = true; }
+        }
+        return any;
+      });
+    }
+    prefsDirty = false;
+  }, delay);
+}
+
+function onPrefsChanged() {
+  if (pullPrefs()) saveCfg();
+  applyCfg();
+  if (open && tab === 'settings' && !formOpen()) render();
+}
+
+async function saveWall(id, dataUrl) {
+  const headers = ctx().getRequestHeaders?.();
+  const version = String(Date.now());
+  const previous = wallVersion(id);
+  try {
+    if (!prefs) throw new Error('sync not ready');
+    await uploadFile(headers, `bc_wall_${id}_${version}.jpg`, dataUrl.slice(dataUrl.indexOf(',') + 1));
+    await prefs.update(doc => { setPref(doc, 'wall.' + id, version); return true; });
+    try { localStorage.removeItem(LOCAL_WALL + id); } catch { }
+    if (previous) void deleteFile(headers, `bc_wall_${id}_${previous}.jpg`);
+    return 'server';
+  } catch (error) {
+    console.warn('[Bot Console] wallpaper upload failed, keeping it on this device only', error);
+    localStorage.setItem(LOCAL_WALL + id, dataUrl);
+    return 'device';
+  }
+}
+
+async function clearWall(id) {
+  const previous = wallVersion(id);
+  try { localStorage.removeItem(LOCAL_WALL + id); } catch { }
+  if (!prefs || !previous) return;
+  await prefs.update(doc => { setPref(doc, 'wall.' + id, ''); return true; });
+  void deleteFile(ctx().getRequestHeaders?.(), `bc_wall_${id}_${previous}.jpg`);
+}
+
+async function migrateLegacyWall() {
+  const legacy = extSlot().wall;
+  if (legacy === undefined) return;
+  const id = skinById(cfg.skin) ? cfg.skin : 'default';
+  if (typeof legacy === 'string' && legacy.startsWith('data:image') && !wallVersion(id)) {
+    try { if (await saveWall(id, legacy) !== 'server') return; } catch { return; }
+  }
+  delete extSlot().wall;
+  saveApi();
+}
+
+async function startPrefs() {
+  const headers = ctx().getRequestHeaders?.();
+  const handle = await accountHandle(headers);
+  if (handle === null) return;
+  prefs = createSyncedDoc({
+    name: 'bc_prefs.json', headers, cacheKey: 'bc_prefs_v1:' + encodeURIComponent(handle),
+    empty: emptyPrefs, merge: mergePrefs, onChange: () => { if (prefs) onPrefsChanged(); },
+  });
+  await prefs.ready;
+  await prefs.update(doc => {
+    let any = false;
+    for (const key of SYNC_CFG) {
+      if (!Object.hasOwn(doc.keys, key) && cfg[key] !== CFG_DEFAULT[key]) { setPref(doc, key, cfg[key]); any = true; }
+    }
+    return any;
+  });
+  onPrefsChanged();
+  await migrateLegacyWall();
+}
 
 function loadSkinAssets(id) {
   if (!document.getElementById('bc-skins-css')) {
@@ -2713,7 +2824,6 @@ let chatSkinId;
 function syncChatRegex() {
   const scripts = listRegex().map(row => row.s);
   try {
-    // The host also exposes Regex scripts attached to the current preset.
     if (readHostRegex) scripts.push(...readHostRegex({ allowedOnly: true }));
   } catch (error) { console.warn('[Bot Console] preset Regex unavailable', error); }
   try {
@@ -2958,6 +3068,7 @@ function mountUi() {
     if (!k) return;
     cfg[k] = Number(e.target.value);
     saveCfg();
+    if (SYNC_CFG.includes(k)) pushPrefs();
     applyCfg();
     const lab = $(`#bc-v-${k}`);
     if (lab) lab.textContent = k === 'size' ? `${cfg.size}px` : `${cfg.transparent}%`;
@@ -3022,6 +3133,7 @@ function mountUi() {
         cfg.size = CFG_DEFAULT.size;
         cfg.transparent = 0;
         saveCfg();
+        pushPrefs();
         savePos();
         applyCfg();
         placeFab(true);
@@ -3033,6 +3145,7 @@ function mountUi() {
         if (!premium()) break;
         cfg.skin = skinById(t.dataset.v) ? t.dataset.v : 'default';
         saveCfg();
+        pushPrefs(0);
         applyCfg();
         render();
         break;
@@ -3043,11 +3156,11 @@ function mountUi() {
           const f = await picked;
           if (!f) return;
           try {
-            extSlot().wall = await packWallpaper(f);
-            saveApi();
+            const where = await saveWall(activeSkin(), await packWallpaper(f));
             applySkin();
             render();
-            toast('success', 'เปลี่ยนวอลเปเปอร์แล้ว');
+            if (where === 'server') toast('success', 'เปลี่ยนวอลเปเปอร์ของธีมนี้แล้ว');
+            else toast('warning', 'บันทึกไว้เฉพาะเครื่องนี้ (อัปโหลดขึ้นเซิร์ฟเวอร์ไม่สำเร็จ)');
           } catch (err) {
             console.error('[Bot Console] wallpaper failed', err);
             toast('error', 'อ่านรูปนี้ไม่ได้');
@@ -3057,10 +3170,7 @@ function mountUi() {
       }
       case 'wallClear':
         if (!premium()) break;
-        delete extSlot().wall;
-        saveApi();
-        applySkin();
-        render();
+        void clearWall(activeSkin()).then(() => { applySkin(); render(); });
         break;
       case 'imgMenu': { const k = t.dataset.key; imgMenu = imgMenu === k ? null : k; urlFor = null; render(); break; }
       case 'upload': doUpload(t.dataset.key); break;
@@ -3390,6 +3500,14 @@ function mountUi() {
           saveNow();
         }
         break;
+      case 'syncServer':
+        (async () => {
+          await Promise.all([progressStore.sync(), prefs?.sync()]);
+          applyCfg();
+          render();
+          toast('success', 'ซิงค์กับเซิร์ฟเวอร์แล้ว');
+        })();
+        break;
       case 'syncNow':
         (async () => {
           try { await ctx().reloadCurrentChat?.(); toast('success', 'โหลดข้อมูลล่าสุดแล้ว'); }
@@ -3540,8 +3658,9 @@ jQuery(() => {
   void import('/scripts/extensions/regex/engine.js').then(module => {
     readHostRegex = module.getRegexScripts;
     syncChatRegex();
-  }).catch(() => { /* Use the Regex lists exposed by older SillyTavern versions. */ });
+  }).catch(() => {});
   initMemory();
+  void startPrefs().catch(error => console.warn('[Bot Console] settings sync failed', error));
   void setLicense(extSlot().license).then(async (valid) => {
     if (!valid) return;
     applyCfg();

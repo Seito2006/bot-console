@@ -111,7 +111,6 @@ function textFromJson(j) {
   return textOf(ch?.message?.content) || (typeof ch?.text === 'string' ? ch.text : '');
 }
 
-// Reads OpenAI-style SSE text into `acc` ({ text, finish, thought }).
 function readSse(raw, acc) {
   for (const line of raw.split('\n')) {
     const t = line.trim();
@@ -148,8 +147,6 @@ async function readStream(res) {
   return readSse(`${buf}\n`, acc);
 }
 
-// Same road the roleplay itself uses: the request goes through SillyTavern's own server
-// (custom source) instead of straight from the browser.
 const ST_URL = '/api/backends/chat-completions/generate';
 
 function stHeaders() {
@@ -219,7 +216,6 @@ export async function chat(a, messages, signal) {
         const raw = e.raw || '';
         if (e.status === 400 && opts.tokenKey === 'max_tokens' && /max_completion_tokens/i.test(raw)) { opts.tokenKey = 'max_completion_tokens'; continue; }
         if (e.status === 400 && opts.temperature !== null && /temperature/i.test(raw)) { opts.temperature = null; continue; }
-        // a thinking model that spent its whole budget thinking: give it more room, same route
         if (e.empty && boosts < 2 && (opts.tokens ?? 0) < 16000) { boosts++; opts.tokens = Math.min(16384, Math.max(4096, (opts.tokens || 1024) * 2)); continue; }
         if (e.status >= 500 && !retried5xx) { retried5xx = true; await sleep(1200, signal); continue; }
         errors.push(e);

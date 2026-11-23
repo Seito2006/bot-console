@@ -27,7 +27,6 @@ const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(String(h).replace('#', '').s
 const toHex = (a) => `#${a.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 const mixW = (a, t) => a.map((v) => v + (255 - v) * t);
 
-// Colours used to repaint the bot's chat cards (Field HUD, character banner, Valkyrie status) for a skin.
 export function uiPalette(id) {
   const u = skinById(id)?.ui;
   if (!u) return null;

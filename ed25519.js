@@ -1,6 +1,3 @@
-// Pure-JS Ed25519 signature verification (RFC 8032), BigInt based.
-// Only used when the browser has no WebCrypto Ed25519 (older Android Chrome / WebView,
-// or a page opened over plain http on a LAN address where crypto.subtle does not exist).
 const P = (1n << 255n) - 19n;
 const L = (1n << 252n) + 27742317777372353535851937790883648493n;
 const D = (((P - 121665n) % P) * modPow(121666n, P - 2n, P)) % P;
@@ -138,7 +135,6 @@ const BASE = decodePoint((() => {
 
 const samePoint = (p, q) => mod(p[0] * q[2]) === mod(q[0] * p[2]) && mod(p[1] * q[2]) === mod(q[1] * p[2]);
 
-// publicKey: 32 raw bytes, signature: 64 bytes, message: Uint8Array. Cofactorless check, S < L enforced.
 export function verifyEd25519(publicKey, signature, message) {
   try {
     if (!publicKey || publicKey.length !== 32 || !signature || signature.length !== 64) return false;

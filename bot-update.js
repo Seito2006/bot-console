@@ -12,7 +12,6 @@ function installed(card, version) {
   return (current[0] - incoming[0] || current[1] - incoming[1] || current[2] - incoming[2]) >= 0;
 }
 
-// SillyTavern exports PNG cards with the base64 JSON in a tEXt chunk.
 function pngCard(buffer) {
   const view = new DataView(buffer);
   if (view.byteLength < 20 || view.getUint32(0) !== 0x89504e47 || view.getUint32(4) !== 0x0d0a1a0a) {

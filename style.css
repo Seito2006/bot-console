@@ -728,7 +728,6 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 
 #bc-panel .bc-wallprev { background-image: var(--bc-wall); background-position: center center; background-size: contain; }
 
-/* Premium licence card */
 #bc-panel .bc-licrow { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
 #bc-panel .bc-licrow .bc-input { letter-spacing: .06em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 #bc-panel .bc-licrow .bc-segb { flex: 0 0 auto; width: auto; padding-left: 14px; padding-right: 14px; white-space: nowrap; }
@@ -744,7 +743,6 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 #bc-panel .bc-lic-ok + .bc-dim { margin-bottom: 8px; }
 #bc-panel .bc-card > .bc-dim { font-size: 11px; line-height: 1.5; }
 
-/* Keep the chat composer clear of the panel's decorative corner strokes in every skin. */
 #bc-panel:has(#bc-body.phone)::before,
 #bc-panel:has(#bc-body.phone)::after { display: none !important; }
 #bc-panel .bcp-comp { position: relative; z-index: 2; }
@@ -752,7 +750,6 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 #bc-panel .bcp-comp::before, #bc-panel .bcp-comp::after,
 #bc-panel .bcp-send::before, #bc-panel .bcp-send::after { content: none !important; display: none !important; border: 0 !important; background: none !important; box-shadow: none !important; }
 
-/* The stock console uses an instrument readout and a compact command board. */
 #bc-panel .console-home { justify-content: center; }
 #bc-panel .console-home .bc-widget { display: grid; gap: 7px; padding: 16px; border-left: 4px solid var(--bc-accent); background: var(--bc-card); }
 #bc-panel .console-home .bc-clock { font: 600 38px/1.1 monospace; font-variant-numeric: tabular-nums; }
@@ -762,8 +759,6 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 #bc-panel .console-home .bc-al { white-space: normal; }
 #bc-panel .console-home .bc-badge { right: 1px; top: 1px; }
 
-/* Keep the entire portrait and controls in one scroll plane. The clear area is
-   measured against the actual panel width, not the browser viewport. */
 #bc-panel.at-home.has-wall { background: var(--bc-bg2); }
 #bc-panel.at-home.has-wall #bc-body { padding: 0; container-type: inline-size; }
 #bc-panel.at-home.has-wall #bc-body > .bc-home {
@@ -788,9 +783,12 @@ dialog.bc-update-popup button:disabled { opacity: .55; cursor: default; }
 #bc-panel.at-home.has-wall[data-skin="sentience"] #bc-body > .bc-home { --portrait-space: 77cqw; }
 #bc-panel.at-home.has-wall[data-skin="seele"] #bc-body > .bc-home { --portrait-shift: -44cqw; --portrait-space: 74cqw; }
 #bc-panel.at-home.has-wall.custom-wall[data-skin] #bc-body > .bc-home {
-  --portrait-shift: 0px; --portrait-space: clamp(160px,64cqw,300px);
-  background-size: auto,auto var(--portrait-space),auto;
+  --portrait-shift: 0px; --portrait-space: clamp(190px,68cqw,320px);
+  min-height: 100%;
+  background-size: auto, cover, auto;
+  background-position: 0 0, center top, 0 0;
 }
+#bc-panel.custom-wall[data-skin] .bc-wallprev { background-size: cover; background-position: center top; }
 #bc-panel.at-home.has-wall .console-home :is(.bc-widget,.bc-app) { background: var(--home-plate); color: var(--home-text); }
 
 #bc-panel #bc-body { min-width: 0; min-height: 0; }

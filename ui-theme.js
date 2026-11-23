@@ -1,4 +1,3 @@
-// Apply the selected palette in the Regex replacement before SillyTavern renders it.
 const PALETTE_KEY = {
   '#3b9dff': 'ac', '#2f8cff': 'ac', '#6cc4ff': 'ac2',
   '#f4faff': 't1', '#dcebff': 't2', '#eaf4ff': 't2', '#cfe6ff': 't2', '#eaf5ff': 'pale',
@@ -40,7 +39,6 @@ export function themeRegex(scripts) {
   }
 }
 
-// Convert cards already on screen when the extension or a new chat first loads.
 export function themeVisibleCards(chat) {
   if (!chat) return;
   for (const card of chat.querySelectorAll('.mes_text div[style], .mes_text .hs')) {
