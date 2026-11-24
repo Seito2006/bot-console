@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.1.0",
+    "changes": [
+      "Extension: เพิ่มการรองรับ Honkai Star: Rail เข้าสู่ระบบ",
+      "Honkai Star Rail Rpg: เพิ่มตัวเลือก Caelus เข้ามาให้เลือก"
+    ]
+  },
+  {
     "version": "2.0.2",
     "changes": [
       "เพิ่มสินค้าเริ่มต้นของ HI3 Rpg จาก 9 เป็น 28 รายการใน 6 หมวด พร้อมตัวกรองและป้ายผลต่อ HP, Corruption และ Bond",

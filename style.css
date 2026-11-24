@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,600;1,700&display=swap');
+@import url('./hsr.css');
+@import url('./hsr-premium.css');
 
 #bc-panel, #bc-fab, #bc-notify, #bc-api-drawer {
   --bc-bg: rgba(6, 12, 26, .96); --bc-bg2: #0a1530; --bc-card: rgba(16, 32, 62, .68);
@@ -36,14 +38,16 @@
   -webkit-tap-highlight-color: transparent;
   transition: transform .12s;
 }
-#bc-fab .bc-hex {
+#bc-fab :is(.bc-hex, .bc-hsr-icon) {
   position: absolute; inset: 0; display: grid; place-items: center;
   clip-path: circle(50% at 50% 50%);
   background: linear-gradient(135deg, var(--bc-accent), var(--bc-accent2));
   color: var(--bc-accent); font-size: calc(var(--bc-fab-size) * .34);
 }
-#bc-fab .bc-hex::before { content: ''; position: absolute; inset: 2.5px; clip-path: circle(50% at 50% 50%); background: var(--bc-bg2); }
-#bc-fab .bc-hex i { position: relative; }
+#bc-fab :is(.bc-hex, .bc-hsr-icon)::before { content: ''; position: absolute; inset: 2.5px; clip-path: circle(50% at 50% 50%); background: var(--bc-bg2); }
+#bc-fab :is(.bc-hex, .bc-hsr-icon) i { position: relative; }
+#bc-fab:not([data-profile="hsr"]) .bc-hsr-icon,
+#bc-fab[data-profile="hsr"] .bc-hex { display: none; }
 #bc-fab img {
   position: absolute; inset: 2.5px; width: calc(100% - 5px); height: calc(100% - 5px);
   object-fit: cover; clip-path: circle(50% at 50% 50%); pointer-events: none; -webkit-user-drag: none;

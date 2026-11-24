@@ -37,22 +37,25 @@ SillyTavern จะดาวน์โหลดและโหลด Extension ใ
 
 ### แนบไฟล์อัปเดตบอท
 
-วางการ์ดที่ส่งออกจาก SillyTavern แบบ PNG หรือ JSON ในโฟลเดอร์ `bots/` แล้วกำหนดชื่อและชื่อไฟล์ใน `bot-update.json` ที่อยู่ข้าง `manifest.json` ตัวอย่างสำหรับผู้เผยแพร่
+วางการ์ดที่ส่งออกจาก SillyTavern แบบ PNG หรือ JSON ใน `bots/hi3/` หรือ `bots/hsr/` แล้วเพิ่มรายการของแต่ละบอทใน `bot-update.json` ที่อยู่ข้าง `manifest.json` ตัวอย่างสำหรับผู้เผยแพร่
 
 ```json
-{ "name": "HI3 Rpg", "version": "2.0.3", "file": "HI3 Rpg.json", "cover": "HI3 Rpg.png", "lorebook": "Honkai 3 LB.json" }
+[
+  { "name": "HI3 Rpg", "version": "2.0.3", "folder": "hi3", "file": "HI3 Rpg.json", "cover": "HI3 Rpg.png", "lorebook": "Honkai 3 LB.json" },
+  { "name": "Honkai Star Rail Rpg", "version": "1.0.0", "folder": "hsr", "file": "Honkai Star Rail Rpg.json", "lorebook": "HSR LB.json" }
+]
 ```
 
-ตั้งชื่อให้ตรงกับชื่อในการ์ด เพิ่มเลข version เมื่อปล่อยชุดไฟล์ใหม่ การ์ดรุ่นแรกที่ไม่มีเลขรุ่นและการ์ดที่มีเลขรุ่นเก่ากว่าจะได้รับแจ้งอัปเดต หากพบการ์ดชื่อตรงกันหลายใบ ให้ผู้เล่นเปิดแชทของการ์ดที่จะอัปเดต ป็อปอัปจะแสดงชื่อไฟล์เป้าหมายก่อนยืนยัน ระบบเขียนการ์ดทับชื่อไฟล์เดิมและเก็บแชทเดิมไว้ การ์ดแบบ PNG จะอัปเดตรูปด้วย ส่วน JSON จะใช้รูป cover หากกำหนดไว้
+ตั้งชื่อให้ตรงกับชื่อในการ์ดและเพิ่มเลข version ของบอทตัวนั้นเมื่อปล่อยชุดไฟล์ใหม่ การ์ดรุ่นแรกที่ไม่มีเลขรุ่นและการ์ดที่มีเลขรุ่นเก่ากว่าจะได้รับแจ้งอัปเดต หรือเปิด **ตั้งค่า → ทั่วไป** เพื่อเลือกชุดอัปเดตที่มี หากพบการ์ดชื่อตรงกันหลายใบ ให้ผู้เล่นเปิดแชทของการ์ดที่จะอัปเดต ป็อปอัปจะแสดงชื่อไฟล์เป้าหมายก่อนยืนยัน ระบบเขียนการ์ดทับชื่อไฟล์เดิมและเก็บแชทเดิมไว้ การ์ดแบบ PNG จะอัปเดตรูปด้วย ส่วน JSON จะใช้รูป cover หากกำหนดไว้
 
 ## Troubleshooting
 
-- **Console button not showing** – the button only appears in chats with the bot named `HI3 Rpg` (change `REQUIRED_NAME` in `profiles.js`, or leave it empty to allow every bot). Alternatively open **Extensions → Seito's bot Console** and turn on *show in every chat*. The panel there also tells you why the button is hidden. *Settings → Reset button* restores its position and size.
+- **Console button not showing** – the button appears in chats with `HI3 Rpg` or `Honkai Star Rail Rpg` by default. Open **Extensions → Seito's bot Console** and turn on *show in every chat* for other bots. The panel there also tells you why the button is hidden. *Settings → Reset button* restores its position and size.
 - **Premium key on several devices** – the key is not tied to a device. Devices that share one SillyTavern server and user account pick it up automatically; separate SillyTavern installs each need the key entered once.
 
 ### แก้ปัญหาเบื้องต้น
 
-- **ไม่เห็นปุ่มคอนโซล** – ปุ่มจะแสดงเฉพาะแชทของบอทชื่อ `HI3 Rpg` (แก้ชื่อที่ `REQUIRED_NAME` ใน `profiles.js` หรือเว้นว่างเพื่อให้ทุกบอทใช้ได้) หรือเปิด **Extensions → Seito's bot Console** แล้วเปิดสวิตช์แสดงในทุกแชท ตรงนั้นบอกด้วยว่าปุ่มถูกซ่อนเพราะอะไร ส่วน ตั้งค่า → รีเซ็ตตำแหน่งและขนาดปุ่ม จะดึงปุ่มกลับมาที่เดิม
+- **ไม่เห็นปุ่มคอนโซล** – ปุ่มจะแสดงในแชทของ `HI3 Rpg` และ `Honkai Star Rail Rpg` โดยอัตโนมัติ สำหรับบอทอื่นให้เปิด **Extensions → Seito's bot Console** แล้วเปิดสวิตช์แสดงในทุกแชท ตรงนั้นบอกด้วยว่าปุ่มถูกซ่อนเพราะอะไร ส่วน ตั้งค่า → รีเซ็ตตำแหน่งและขนาดปุ่ม จะดึงปุ่มกลับมาที่เดิม
 - **รหัส Premium หลายเครื่อง** – รหัสไม่ผูกกับเครื่อง เครื่องที่ใช้เซิร์ฟเวอร์และบัญชีผู้ใช้ SillyTavern เดียวกันจะได้รหัสเอง ส่วนเครื่องที่รัน SillyTavern แยกกันต้องใส่รหัสเครื่องละครั้ง
 
 ## License

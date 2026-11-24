@@ -1,5 +1,7 @@
 import { genericParser } from './core.js';
 import { hi3Parser } from './adapters-hi3.js';
+import { applyHsrPatch, hsrParser } from './hsr.js';
+import { HSR_SHOP } from './hsr-shop.js';
 import { DEFAULT_SHOP } from './shop.js';
 
 const SKY = {
@@ -12,7 +14,43 @@ const SKY = {
   '--bc-accent2': '#8fd0ff',
 };
 
+export const REQUIRED_NAME = 'HI3 Rpg';
+export const HSR_NAME = 'Honkai Star Rail Rpg';
+
+const DEFAULT_PROFILE = {
+  id: 'default',
+  label: 'Bot Console',
+  match: () => true,
+  theme: SKY,
+  bondMax: 100,
+  defaults: {},
+  playerFields: [
+    { key: 'title', label: 'ตำแหน่ง' },
+    { key: 'element', label: 'ธาตุ' },
+    { key: 'weapon', label: 'อาวุธ' },
+  ],
+  uiToggles: [],
+  parsers: [genericParser],
+};
+
 export const PROFILES = [
+  {
+    ...DEFAULT_PROFILE,
+    id: 'hsr',
+    label: 'Honkai Star Rail',
+    match: (c) => hasName(c, HSR_NAME),
+    shop: HSR_SHOP,
+    playerFields: [
+      { key: 'path', label: 'Path' },
+      { key: 'condition', label: 'สภาพร่างกาย' },
+      { key: 'hp', label: 'พลังชีวิต' },
+      { key: 'stamina', label: 'ความอึด' },
+      { key: 'held_item', label: 'ของที่ถืออยู่' },
+      { key: 'outfit', label: 'ชุดที่สวมใส่' },
+    ],
+    parsers: [genericParser, hsrParser],
+    applyPatch: applyHsrPatch,
+  },
   {
     id: 'hi3',
     label: 'Honkai Impact 3rd',
@@ -35,24 +73,8 @@ export const PROFILES = [
     ],
     parsers: [genericParser, hi3Parser],
   },
-  {
-    id: 'default',
-    label: 'Bot Console',
-    match: () => true,
-    theme: SKY,
-    bondMax: 100,
-    defaults: {},
-    playerFields: [
-      { key: 'title', label: 'ตำแหน่ง' },
-      { key: 'element', label: 'ธาตุ' },
-      { key: 'weapon', label: 'อาวุธ' },
-    ],
-    uiToggles: [],
-    parsers: [genericParser],
-  },
+  DEFAULT_PROFILE,
 ];
-
-export const REQUIRED_NAME = 'HI3 Rpg';
 
 const normName = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 

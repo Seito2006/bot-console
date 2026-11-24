@@ -86,6 +86,7 @@ function parseCached(parse, text) {
 
 export function computeState(profile, chat, manual, onReply) {
   const state = structuredClone(profile.defaults || {});
+  const applyPatch = profile.applyPatch || deepMerge;
   const edits = [...(manual || [])].sort((a, b) => a.at - b.at);
   let mi = 0;
   for (let i = 0; i < chat.length; i++) {
@@ -93,7 +94,7 @@ export function computeState(profile, chat, manual, onReply) {
     const m = chat[i];
     if (!m || m.is_user || m.is_system) continue;
     for (const parse of profile.parsers) {
-      for (const patch of parseCached(parse, m.mes || '')) deepMerge(state, patch);
+      for (const patch of parseCached(parse, m.mes || '')) applyPatch(state, patch);
     }
     onReply?.(m, state);
   }

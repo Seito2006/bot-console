@@ -1,7 +1,24 @@
-{
-  "name": "HI3 Rpg",
-  "version": "2.0.3",
-  "file": "HI3 Rpg.json",
-  "lorebook": "Honkai 3 LB.json",
-  "cover": "HI3 Rpg.png"
-}
+[
+  {
+    "name": "HI3 Rpg",
+    "version": "2.0.3",
+    "folder": "hi3",
+    "file": "HI3 Rpg.json",
+    "lorebook": "Honkai 3 LB.json",
+    "cover": "HI3 Rpg.png"
+  },
+  {
+    "name": "Honkai Star Rail Rpg",
+    "version": "2.0.0",
+    "folder": "hsr",
+    "file": "Honkai Star Rail Rpg.json",
+    "lorebook": "HSR LB.json",
+    "changes": ["เพิ่มตัวเลือก Caelus เข้ามาให้เลือก"],
+    "lorebookControls": ["DATE & Tracker", "Bond & Trust Controller", "Amber Era Calendar Controller"],
+    "requiredTags": ["Seito"],
+    "requiredRegex": {
+      "Trailblaze Create": "name=\"trailblazer\"",
+      "Trailblaze Dossier": "id=\"ui-trailblazer\""
+    }
+  }
+]

@@ -7,7 +7,7 @@ const VERIFY_KEYS = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const verifierCache = new Map();
 const encoder = new TextEncoder();
-let active = '';
+const active = new Map();
 
 function decodeBase64Url(value) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
@@ -50,7 +50,6 @@ async function signatureValid(kid, message, signature) {
 }
 
 let lastReason = '';
-let activation = null;
 export const licenseReason = () => lastReason;
 
 export async function checkKey(raw, { savedActivation = null } = {}) {
@@ -67,6 +66,8 @@ export async function checkKey(raw, { savedActivation = null } = {}) {
 
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes));
     if (!payload || payload.v !== 1 || payload.p !== 'bot-console' || !UUID.test(payload.id)) return { key: '', reason: 'format' };
+    const pack = payload.pack === undefined ? 'hi3' : payload.pack;
+    if (!['hi3', 'hsr', 'both'].includes(pack)) return { key: '', reason: 'format' };
     if (!Number.isSafeInteger(payload.iat) || (payload.exp !== null && !Number.isSafeInteger(payload.exp))) return { key: '', reason: 'format' };
     const redeem = payload.mode === 'redeem';
     if (payload.mode !== undefined && (!redeem || !Number.isSafeInteger(payload.exp))) return { key: '', reason: 'format' };
@@ -80,7 +81,7 @@ export async function checkKey(raw, { savedActivation = null } = {}) {
 
     const message = encoder.encode(`${prefix}.${encodedPayload}`);
     if (!await signatureValid(payload.kid, message, signature)) return { key: '', reason: 'signature' };
-    return { key: value, reason: '', activation: redeem ? { key: value, at: redeemed ? recorded : now } : null };
+    return { key: value, pack, reason: '', activation: redeem ? { key: value, at: redeemed ? recorded : now } : null };
   } catch {
     return { key: '', reason: 'format' };
   }
@@ -90,23 +91,23 @@ export async function parseKey(raw) {
   return (await checkKey(raw)).key || null;
 }
 
-export const premium = () => !!active;
-export const licenseKey = () => active;
-export const licenseActivation = () => activation;
+export const premium = () => active.size > 0;
+export const themeEntitled = pack => active.has(pack);
+export const licenseRecords = () => [...new Set(active.values())].map(({ key, activation }) => ({ key, activation }));
 
-export async function setLicense(raw, { preserveActive = false, savedActivation = null } = {}) {
+export async function setLicense(raw, { preserveActive = false, savedActivation = null, onlyMissing = false } = {}) {
   const r = await checkKey(raw, { savedActivation });
-  if (r.key || !preserveActive) {
-    active = r.key;
-    activation = r.activation || null;
-  }
+  if (!preserveActive) active.clear();
   lastReason = r.reason;
-  return !!r.key;
+  if (!r.key) return false;
+  const packs = r.pack === 'both' ? ['hi3', 'hsr'] : [r.pack];
+  const writable = packs.filter(pack => !onlyMissing || !active.has(pack));
+  for (const pack of writable) active.set(pack, r);
+  return writable.length > 0;
 }
 
 export function clearLicense() {
-  active = '';
-  activation = null;
+  active.clear();
   lastReason = '';
 }
 

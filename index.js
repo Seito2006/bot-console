@@ -1,6 +1,6 @@
-import { PROFILES, pickProfile, REQUIRED_NAME, hasName } from './profiles.js';
+import { PROFILES, pickProfile, REQUIRED_NAME, HSR_NAME, hasName } from './profiles.js';
 import { computeState, parseBar, esc } from './core.js';
-import { avatarCandidates, findChar, detectForm, fileUrl } from './avatars.js';
+import { avatarCandidates as bundledAvatarCandidates, findChar as findBundledChar, detectForm, fileUrl } from './avatars.js';
 import {
   keyOf, ensurePhone, threadOf, pushMsg, totalUnread, clock, cleanReply, cleanThought, aliasesFor,
   sceneChecker, chatSig, buildPhonePrompt, buildThoughtPrompt, phoneContextBlock, latestThoughts, thoughtFor, thoughtsPrompt,
@@ -10,7 +10,7 @@ import {
   eventsBlock, applyBar, giftBond, appointPrompt, parseAppts, apptKey, whenState, buildBoardPrompt, parseBoard,
 } from './features.js';
 import { readTurns, syncTurnTexts, turnPrompt } from './roleplay.js';
-import { premium, setLicense, licenseKey, licenseReason, licenseActivation } from './edition.js';
+import { premium, themeEntitled, setLicense, licenseRecords, licenseReason } from './edition.js';
 import { skinById, SKINS, fontHref, uiPalette } from './skins.js';
 import { themeRegex, themeVisibleCards } from './ui-theme.js';
 import { API_DEFAULT, PROVIDERS, apiReady, fetchModels, chat as apiChat, buildMessages } from './api.js';
@@ -20,12 +20,19 @@ import { createSyncedDoc, emptyPrefs, mergePrefs, prefValue, setPref, uploadFile
 import { createProgressStore, grantActivity, accountLevel, missionExp, XP_PER_LEVEL, POINTS_PER_LEVEL } from './progress.js';
 import { createUpdater } from './updates.js';
 import { createBotUpdater } from './bot-update.js';
+import { hsrPhoneOffers, hsrPortrait, journeyPrompt, missionFinished, readJourney, readTrailblazer } from './hsr.js';
+import { hsrLocalShop, hsrStoryStock } from './hsr-shop.js';
+import { HSR_SKINS, hsrSkinById } from './hsr-skins.js';
+import { HSR_TABS, hsrHome, hsrProfile, hsrJournal, hsrMap, hsrMissions, hsrSkillRow } from './hsr-ui.js';
+import { appIcon, launcher, mountLauncher } from './hsr-launcher.js';
+import { storyCards, lockCards } from './hsr-widgets.js';
 
 const EXT_ID = 'bot_console';
 const TOP_KEY = 'bc_fab_top';
 const CFG_KEY = 'bc_settings';
 const POS_KEY = 'bc_fab_pos';
-const ICON_URL = new URL('./icon.jpg', import.meta.url).href;
+const HI3_ICON = new URL('./icons/hi3/icon.jpg', import.meta.url).href;
+const HSR_ICON = new URL('./icons/hsr/icon.jpg', import.meta.url).href;
 const THEMES_URL = new URL('./themes/', import.meta.url).href;
 const SKINS_CSS = new URL('./skins.css?v=2.0.1', import.meta.url).href;
 const TABS = [
@@ -40,6 +47,8 @@ const TABS = [
 ];
 
 let tab = 'home';
+let skinPreview = null;
+let hsrLocation = '';
 let settingsSection = 'account';
 let progressStore;
 let updater;
@@ -57,6 +66,7 @@ let panel = null;
 let fab = null;
 
 let lastMd = null;
+let lastChatKey = null;
 let epoch = 0;
 let phoneName = null;
 let phoneDraft = {};
@@ -146,7 +156,7 @@ const formOpen = () => editing !== null || skillForm !== null || relForm !== nul
 
 function visibilityState() {
   if (!hasChat()) return 'nochat';
-  if (REQUIRED_NAME && extSlot().showAll !== true && !hasName(ctx(), REQUIRED_NAME)) return 'name';
+  if (REQUIRED_NAME && extSlot().showAll !== true && !hasName(ctx(), REQUIRED_NAME) && !hasName(ctx(), HSR_NAME)) return 'name';
   return 'ok';
 }
 
@@ -164,11 +174,19 @@ function showVisibilityStatus() {
   el.className = `bcx-vis ${st === 'ok' ? 'ok' : 'bad'}`;
   el.textContent = st === 'ok' ? 'ตอนนี้ปุ่มคอนโซลแสดงอยู่ในแชทนี้'
     : st === 'nochat' ? 'ยังไม่ได้เปิดแชท จึงยังไม่แสดงปุ่มคอนโซล'
-      : `ปุ่มคอนโซลซ่อนอยู่: แชทนี้ไม่ใช่บอทชื่อ “${REQUIRED_NAME}” (เปิดสวิตช์ด้านบนเพื่อแสดงในทุกแชท)`;
+      : `ปุ่มคอนโซลซ่อนอยู่ เพราะแชทนี้ไม่ได้เปิดบอท ${REQUIRED_NAME} หรือ ${HSR_NAME} (เปิดสวิตช์ด้านบนเพื่อแสดงในทุกแชท)`;
 }
 
 function updateVisibility() {
-  if (fab) fab.style.display = cur ? '' : 'none';
+  if (fab) {
+    fab.style.display = cur ? '' : 'none';
+    fab.dataset.profile = cur?.profile.id || '';
+  }
+  const profile = cur?.profile.id || '';
+  if (panel && panel.dataset.profile !== profile) {
+    panel.dataset.profile = profile;
+    applySkin();
+  }
   if (!cur && open) setOpen(false);
   if (!cur) hideNotify();
   showVisibilityStatus();
@@ -181,18 +199,36 @@ function seenForm(c, avatar) {
   return seenCache.get(k);
 }
 
+function computeConsoleState(profile, chat, meta, onReply) {
+  const source = profile.id === 'hsr'
+    ? { ...profile, defaults: { ...profile.defaults, rel: meta.customRel } }
+    : profile;
+  return computeState(source, chat, meta.manual, onReply);
+}
+
 function rebuild() {
   seenCache.clear();
-  const md = hasChat() ? ctx().chatMetadata : null;
+  const c = ctx();
+  const md = hasChat() ? c.chatMetadata : null;
+  const chatId = md ? c.getCurrentChatId?.() ?? c.chatId : null;
+  const owner = c.groupId || c.characters?.[c.characterId]?.avatar || c.characterId;
+  const chatKey = chatId != null && chatId !== '' ? JSON.stringify([c.groupId ? 'group' : 'character', owner, chatId]) : md;
+  const changedView = chatKey !== lastChatKey;
+  lastChatKey = chatKey;
   const changedChat = md !== lastMd;
-  if (changedChat) {
+  if (changedChat || changedView) {
     lastMd = md;
     epoch++;
     phoneName = null; phoneDraft = {}; phoneBusy = {}; phoneSel = null; phoneForm = false;
     thoughtOpen = null; thoughtBusy = null; thoughtErr = null; sceneForce.clear();
     shopForm = null; missionForm = null; apptForm = null; giftFor = null; clearTimeout(autoTimer); hideNotify();
   }
+  const wasHsr = cur?.profile.id === 'hsr';
   const profile = resolveProfile();
+  if ((wasHsr || profile?.id === 'hsr') && (changedView || wasHsr !== (profile?.id === 'hsr'))) {
+    skinPreview = null;
+    tab = 'home'; hsrLocation = ''; editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null;
+  }
   if (!profile) {
     cur = null;
     applyUi();
@@ -203,12 +239,18 @@ function rebuild() {
     return;
   }
   const meta = getMeta();
-  const chat = ctx().chat || [];
+  const chat = c.chat || [];
+  const hsr = profile.id === 'hsr';
   const listingLocations = [];
-  const state = computeState(profile, chat, meta.manual, profile.id === 'hi3' ? (message, turn) => {
+  const onReply = hsr ? (message, turn) => {
+    const offers = hsrPhoneOffers(message.mes || '');
+    if (offers) listingLocations.push([turn.player?.location, offers]);
+  } : profile.id === 'hi3' ? (message, turn) => {
     if (message.mes?.includes('BCSHOP')) listingLocations.push([message, turn.player?.location]);
-  } : undefined);
-  cur = { profile, state, stock: storyStock(listingLocations) };
+  } : undefined;
+  const state = computeConsoleState(profile, chat, meta, onReply);
+  cur = { profile, state, stock: hsr ? hsrStoryStock(listingLocations) : storyStock(listingLocations) };
+  if (hsr) cur.journey = readJourney(chat);
   mergeCustomRel(cur.state, meta);
   mergeCustomMission(cur.state, meta);
   awardActivity();
@@ -312,6 +354,10 @@ function getPersonaAvatarUrl() {
   return '';
 }
 
+const avatarPack = () => cur?.profile.id === 'hsr' ? 'hsr' : 'hi3';
+const findChar = (name) => findBundledChar(name, avatarPack());
+const avatarCandidates = (name, avatar) => bundledAvatarCandidates(name, avatar, avatarPack());
+
 function formFor(name, r) {
   const c = findChar(name);
   if (!c) return null;
@@ -357,8 +403,10 @@ function portraitCands(name, r) {
   const mine = relImgFor(name);
   if (mine) return [mine];
   const fs = formFor(name, r);
-  return fs ? [fileUrl(fs.form.file), ...avatarCandidates(name, '')] : avatarCandidates(name, r?.avatar);
+  return fs ? [fileUrl(fs.form.file), ...avatarCandidates(name, '')] : avatarCandidates(name, characterAvatar(name, r));
 }
+
+const characterAvatar = (name, r) => r?.avatar || (cur?.journey ? hsrPortrait(cur.state, name) : '');
 
 function avatarCircle(name, r, cls = '') {
   const list = portraitCands(name, r).filter(Boolean);
@@ -531,9 +579,27 @@ function applyTurnPrompt(off) {
     c.extension_prompt_types?.IN_CHAT ?? 1, 0, false, c.extension_prompt_roles?.SYSTEM ?? 0);
 }
 
+function applyJourneyPrompt(off = false) {
+  const c = ctx();
+  const chat = c.chat || [];
+  const enabled = cur?.journey && !off && !['quiet', 'impersonate'].includes(generationType);
+  let journey = cur?.journey;
+  let state = cur?.state;
+  if (enabled && replacedReply && chat.at(-1) === replacedReply) {
+    const previous = chat.slice(0, -1);
+    const meta = getMeta();
+    journey = readJourney(previous);
+    state = computeConsoleState(cur.profile, previous, meta);
+    mergeCustomRel(state, meta);
+  }
+  c.setExtensionPrompt?.(EXT_ID + '_hsr_journey', enabled ? journeyPrompt(journey, state.rel, readTrailblazer(chat)) : '',
+    c.extension_prompt_types?.IN_CHAT ?? 1, 1, false, c.extension_prompt_roles?.SYSTEM ?? 0);
+}
+
 function applyPhoneCtx(off = false) {
   off ||= quietTasks > 0;
   applyTurnPrompt(off);
+  applyJourneyPrompt(off);
   applyMemoryCtx(off);
   applyThoughtPrompt(off);
   applyShopCtx(off);
@@ -691,7 +757,7 @@ async function genThought(name) {
   }
 }
 
-const phoneVisible = (key) => open && tab === 'phone' && !!phoneName && keyOf(phoneName) === key;
+const phoneVisible = (key) => open && !panel?.classList.contains('hsr-locked') && tab === 'phone' && !!phoneName && keyOf(phoneName) === key;
 
 function sizeTa(ta) {
   ta.style.height = 'auto';
@@ -699,6 +765,10 @@ function sizeTa(ta) {
 }
 
 function phoneRefresh() {
+  if (open && hsrSkinById(activeSkin()) && (phoneLocked || tab === 'home')) {
+    if (!panel.querySelector('.rail-launcher.arranging')) render();
+    return;
+  }
   if (!open || tab !== 'phone' || !panel) return;
   if (phoneName) updateThread();
   else if (!formOpen()) render();
@@ -804,7 +874,6 @@ function phoneRegen() {
 function mountNotify() {
   notify = document.createElement('div');
   notify.id = 'bc-notify';
-  notify.dataset.theme = cfg.theme;
   notify.hidden = true;
   document.body.appendChild(notify);
   notify.addEventListener('click', (e) => {
@@ -992,7 +1061,9 @@ function syncAutoUi() {
 const shopCatalog = (profile, shop) => catalog(profile, { ...shop, story: cur?.stock });
 function shopShelf(shop) {
   const items = shopCatalog(cur.profile, shop);
-  return cur.profile.id === 'hi3' ? localShop(items, cur.state.player?.location) : { name: '', items };
+  const location = cur.state.player?.location;
+  if (cur.journey) return hsrLocalShop(items, location);
+  return cur.profile.id === 'hi3' ? localShop(items, location) : { name: '', items };
 }
 const shopCfg = () => cur?.profile?.shop || DEFAULT_SHOP;
 
@@ -1007,7 +1078,11 @@ function setPlayer(meta, key, val) {
 }
 const setMoney = (meta, n) => setPlayer(meta, 'money', n);
 
-function setBond(meta, relKey, r, value) {
+function setBond(meta, relKey, r, value, delta) {
+  if (cur.journey) {
+    meta.manual.push({ at: ctx().chat.length, patch: { rel: { [relKey]: { bond: value, delta } } } });
+    return;
+  }
   if (r?.custom && meta.customRel?.[r.ckey]) { meta.customRel[r.ckey].bond = value; return; }
   meta.manual = meta.manual.filter((m) => {
     const x = m?.patch?.rel;
@@ -1083,7 +1158,7 @@ function giveItem(id, who) {
   const bond = Number(r?.bond) || 0;
   const next = Math.min(max, bond + giftBond(item));
   adjustBag(meta, item, -1);
-  setBond(meta, relKey, r, next);
+  setBond(meta, relKey, r, next, next - bond);
   const here = hereStatus(relKey).here;
   if (here) addEvent(`${userName()} gave "${item.name}" to ${relKey} (their bond with ${userName()} rose by ${next - bond}).`);
   giftFor = null;
@@ -1125,8 +1200,15 @@ function viewBag() {
   const temporary = carried.length ? `<div class="bc-sec"><span>ถือไว้ชั่วคราว</span><i class="bc-fill"></i></div>
     ${carried.map(([id, quantity]) => `<div class="bc-row bc-held-item"><b>${esc(names[id] || id)}</b><span class="bc-chip">×${quantity}</span></div>`).join('')}` : '';
   const bag = ownedIds.map(bagRow).join('');
-  return `<div class="bc-sec"><span>ในกระเป๋า</span><em class="bc-count">${ownedIds.length}</em><i class="bc-fill"></i></div>
-    ${bag || empty(carried.length ? 'กระเป๋ายังว่างอยู่' : 'คลังยังว่างอยู่<br>ของที่ซื้อหรือพกในโรลเพลย์จะปรากฏที่นี่')}${temporary}`;
+  const player = cur.journey ? cur.state.player : null;
+  const trackedNames = player && new Set([...ownedIds, ...Object.keys(held)].map(id => keyOf(itemById(id).name)));
+  const storyItems = Array.isArray(player?.hsrInventory) ? player.hsrInventory.filter(name => !trackedNames.has(keyOf(name))) : [];
+  const gear = Array.isArray(player?.hsrEquipment) ? player.hsrEquipment : [];
+  const storyBag = storyItems.map(name => `<div class="bc-row bc-held-item"><b>${esc(name)}</b><span class="bc-chip">จากสถานะในแชท</span></div>`).join('');
+  const equipped = gear.length ? `<div class="bc-sec"><span>สวมใส่อยู่</span><i class="bc-fill"></i></div>
+    ${gear.map(item => `<div class="bc-row bc-held-item"><b>${esc(item.name)}</b>${item.slot ? `<span class="bc-chip">${esc(item.slot)}</span>` : ''}</div>`).join('')}` : '';
+  return `<div class="bc-sec"><span>ในกระเป๋า</span><em class="bc-count">${ownedIds.length + storyItems.length}</em><i class="bc-fill"></i></div>
+    ${bag || storyBag ? bag + storyBag : empty(carried.length ? 'กระเป๋ายังว่างอยู่' : 'คลังยังว่างอยู่<br>ของที่ซื้อหรือพกในโรลเพลย์จะปรากฏที่นี่')}${temporary}${equipped}`;
 }
 
 function viewShop() {
@@ -1191,7 +1273,7 @@ function viewShop() {
       <button class="bc-btn sm" data-act="itemNew"><i class="fa-solid fa-plus"></i>เพิ่ม</button></div>
     ${shopName && location ? `<div class="bc-cat"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${esc(location)}</div>` : ''}
     ${filter}${shopForm === '@new' ? form(null) : ''}${shelves}
-    ${viewBag()}${history}`;
+    ${cur.journey ? '' : viewBag()}${history}`;
 }
 
 function apiCfg() {
@@ -1280,11 +1362,10 @@ function mountApiDrawer(tries = 0) {
   const a = apiCfg();
   const wrap = document.createElement('div');
   wrap.id = 'bc-api-drawer';
-  wrap.dataset.theme = cfg.theme;
   wrap.innerHTML = `<div class="inline-drawer">
-    <div class="inline-drawer-toggle inline-drawer-header"><b>Seito's bot Console</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
+    <div class="inline-drawer-toggle inline-drawer-header"><b class="bcx-title">Seito's bot Console</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
     <div class="inline-drawer-content">
-      <label class="checkbox_label"><input type="checkbox" id="bcx-all"><span>แสดงปุ่มคอนโซลในทุกแชท (ไม่จำกัดเฉพาะบอทชื่อ ${REQUIRED_NAME})</span></label>
+      <label class="checkbox_label"><input type="checkbox" id="bcx-all"><span>แสดงปุ่มคอนโซลในทุกแชท</span></label>
       <div id="bcx-vis" class="bcx-vis"></div>
       <label class="checkbox_label"><input type="checkbox" id="bcx-on"><span>ใช้ API แยกสำหรับส่วนเสริมนี้ (ข้อความอัตโนมัติ ความคิดในใจ กระดานภารกิจ แชทข้อความ)</span></label>
       <div class="bcx-grid">
@@ -1309,6 +1390,7 @@ function mountApiDrawer(tries = 0) {
       </div>
     </div></div>`;
   host.appendChild(wrap);
+  applyDrawerTheme(wrap);
   showVisibilityStatus();
 
   const $d = (id) => wrap.querySelector(`#${id}`);
@@ -1516,6 +1598,10 @@ function portrait(cands, letter, key, cls) {
   const img = list.length
     ? `<img class="bc-rimg" src="${esc(list[0])}" ${list.length > 1 ? `data-c="${esc(JSON.stringify(list))}" ` : ''}data-i="0" alt="">`
     : '';
+  if (cur?.journey && key === 'me') {
+    return `<button type="button" class="bc-port" data-act="imgMenu" data-key="me"
+      aria-label="เปลี่ยนรูปประจำตัว" aria-expanded="${imgMenu === 'me'}"><span class="bc-port-in">${letter}${img}</span></button>`;
+  }
   return `<div class="bc-port ${cls}" data-act="imgMenu" data-key="${esc(key)}" title="เปลี่ยนรูป"><div class="bc-port-in">${letter}${img}</div><span class="bc-cam"><i class="fa-solid fa-camera"></i></span></div>`;
 }
 
@@ -1549,9 +1635,10 @@ function skillList() {
   const raw = cur?.state?.player?.skills;
   const bot = (Array.isArray(raw) ? raw : String(raw ?? '').split(/[|\n;]+/)).map((x) => String(x).trim()).filter(Boolean);
   const seen = new Set(out.map((s) => String(s.n).trim().toLowerCase()));
-  for (const n of bot) {
-    const k = n.toLowerCase();
-    if (!seen.has(k)) { seen.add(k); out.push({ n, d: '', own: false }); }
+  const story = cur?.journey ? Object.values(cur.state.hsrPlayerSkills || {}).filter(skill => typeof skill?.n === 'string') : [];
+  for (const skill of [...story, ...bot.map(n => ({ n }))]) {
+    const k = skill.n.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); out.push({ ...skill, d: skill.d || skill.type || '', own: false }); }
   }
   return out;
 }
@@ -1566,24 +1653,17 @@ function skillFormHtml() {
     <button class="bc-btn ghost" data-act="cancelForm">${s ? 'ยกเลิก' : 'เสร็จ'}</button></div></div>`;
 }
 
+function playerNameBlock(name) {
+  return editing === '@name'
+    ? `<div class="bc-nameedit" data-form><input class="bc-input" value="${esc(name)}" placeholder="ชื่อของคุณ">
+        <button class="bc-ico" data-primary data-act="save" title="บันทึก"><i class="fa-solid fa-check"></i></button>
+        <button class="bc-ico" data-act="cancel" title="ยกเลิก"><i class="fa-solid fa-xmark"></i></button></div>`
+    : `<div class="bc-name"><span>${esc(name)}</span><button class="bc-ico" data-act="edit" data-key="@name" title="เปลี่ยนชื่อ"><i class="fa-solid fa-pen"></i></button></div>`;
+}
+
 function viewPlayer() {
   const { state, profile } = cur;
-  const meta = getMeta();
   const p = state.player || {};
-  const name = meta.me.name || p.name || ctx().name1 || 'Player';
-  const pic = meta.me.avatar || getPersonaAvatarUrl();
-  const letter = esc(firstChar(name).toUpperCase());
-
-  const nameBlock =
-    editing === '@name'
-      ? `<div class="bc-nameedit" data-form><input class="bc-input" value="${esc(name)}" placeholder="ชื่อของคุณ">
-          <button class="bc-ico" data-primary data-act="save" title="บันทึก"><i class="fa-solid fa-check"></i></button>
-          <button class="bc-ico" data-act="cancel" title="ยกเลิก"><i class="fa-solid fa-xmark"></i></button></div>`
-      : `<div class="bc-name"><span>${esc(name)}</span><button class="bc-ico" data-act="edit" data-key="@name" title="เปลี่ยนชื่อ"><i class="fa-solid fa-pen"></i></button></div>`;
-
-  const hero = `<div class="bc-hero">${portrait([pic], letter, 'me', '')}
-    <div class="bc-hbody">${nameBlock}<div class="bc-slash"></div><div class="bc-dim">แตะรูปเพื่อเปลี่ยนรูปประจำตัว</div></div></div>${imgMenuHtml('me')}`;
-
   const tiles = profile.playerFields
     .map((f) => {
       const raw = p[f.key] ?? '';
@@ -1601,10 +1681,20 @@ function viewPlayer() {
     })
     .join('');
 
+  if (cur.journey) return (hsrSkinById(activeSkin()) ? hsrProfile(hsrProfileData()) : '') + tiles;
+  const name = userName();
+  const pic = getMeta().me.avatar || getPersonaAvatarUrl();
+  const letter = esc(firstChar(name).toUpperCase());
+  const hero = `<div class="bc-hero">${portrait([pic], letter, 'me', '')}
+    <div class="bc-hbody">${playerNameBlock(name)}<div class="bc-slash"></div><div class="bc-dim">แตะรูปเพื่อเปลี่ยนรูปประจำตัว</div></div></div>${imgMenuHtml('me')}`;
+  return `${hero}${bagButton()}${tiles}${viewSkills()}`;
+}
+
+function viewSkills() {
   const skills = skillList();
   const items = skills
     .map(
-      (s) => `<div class="bc-skill"><span class="bc-hexi"><i class="fa-solid fa-bolt"></i></span>
+      (s) => cur.journey ? hsrSkillRow(s) : `<div class="bc-skill"><span class="bc-hexi"><i class="fa-solid fa-bolt"></i></span>
       <div class="bc-sbody"><b>${esc(s.n)}</b>${s.d ? `<div class="bc-dim">${esc(s.d)}</div>` : ''}</div>
       ${
         s.own
@@ -1618,8 +1708,7 @@ function viewPlayer() {
     (skillForm !== null ? skillFormHtml() : '') +
     (items || (skillForm === null ? empty('ยังไม่มีสกิล<br>กด “เพิ่ม” เพื่อใส่สกิลที่ครอบครอง') : ''));
 
-  return `${hero}${bagButton()}${tiles}
-    <div class="bc-sec"><span>สกิลที่ครอบครอง</span><em class="bc-count">${skills.length}</em><i class="bc-fill"></i>
+  return `<div class="bc-sec"><span>สกิลที่ครอบครอง</span><em class="bc-count">${skills.length}</em><i class="bc-fill"></i>
       <button class="bc-btn sm" data-act="skillNew"><i class="fa-solid fa-plus"></i>เพิ่ม</button></div>${skillBody}`;
 }
 
@@ -1637,7 +1726,9 @@ function viewRel() {
           <div class="bc-btns"><button class="bc-btn" data-primary data-act="relCreate">เพิ่มตัวละคร</button>
           <button class="bc-btn ghost" data-act="cancelForm">ยกเลิก</button></div></div>`
       : '';
-  if (!list.length) return head + newForm + empty('ยังไม่มีตัวละคร<br>กด “เพิ่ม” หรือให้บอทส่งแท็ก <code>HI_Char</code>');
+  if (!list.length) return head + newForm + empty(cur.journey
+    ? 'ความสัมพันธ์จะปรากฏเมื่อมีการบันทึกในเรื่อง หรือกด “เพิ่ม” เพื่อใส่เอง'
+    : 'ยังไม่มีตัวละคร<br>กด “เพิ่ม” หรือให้บอทส่งแท็ก <code>HI_Char</code>');
 
   const hint = '<div class="bc-dim bc-hint">แตะที่การ์ดตัวละครเพื่อดูความคิดในใจ (ต้องอยู่ในฉากปัจจุบัน)</div>';
   const cards = list
@@ -1649,7 +1740,7 @@ function viewRel() {
       const dTxt = delta ? `<b class="${delta > 0 ? 'bc-up' : 'bc-down'}">${delta > 0 ? '+' : ''}${delta}</b>` : '';
       const mine = relImgFor(name);
       const fs = formFor(name, r);
-      const cands = mine ? [mine] : fs ? [fileUrl(fs.form.file), ...avatarCandidates(name, '')] : avatarCandidates(name, r?.avatar);
+      const cands = mine ? [mine] : fs ? [fileUrl(fs.form.file), ...avatarCandidates(name, '')] : avatarCandidates(name, characterAvatar(name, r));
       const letter = esc(firstChar(name).toUpperCase());
       const chips = [...new Set([r?.type, r?.stage, r?.tag].map((x) => String(x ?? '').trim()).filter(Boolean))]
         .map((x) => `<span class="bc-chip">${esc(x)}</span>`)
@@ -1682,7 +1773,8 @@ function viewRel() {
       return `<div class="bc-card bc-rel" data-rel="${esc(name)}"><div class="bc-rcard">${portrait(cands, letter, key, 'sm')}
         <div class="bc-rbody"><div class="bc-line"><b class="bc-rname">${esc(name)}</b>${tools}</div>
         <div class="bc-tags">${sceneChip}${chips}</div>
-        <div class="bc-bondline"><i class="fa-solid fa-heart"></i><span class="bc-num">${bond}<small>/${max}</small></span>${dTxt}</div>
+        <div class="bc-bondline"><i class="fa-solid fa-heart"></i><span class="bc-num">${bond}<small>/${max}</small></span>${dTxt}
+          ${cur.journey && Number.isFinite(r?.trust) ? `<span class="bc-dim">ความไว้ใจ ${r.trust}/100</span>` : ''}</div>
         <div class="bc-bar seg"><i style="width:${pct}%"></i></div></div></div>${edit}${imgMenuHtml(key, strip)}${thoughtOpen === name ? thoughtHtml(name) : ''}</div>`;
     })
     .join('');
@@ -2206,7 +2298,8 @@ async function applyLicense() {
   const button = panel?.querySelector('[data-act="licApply"]');
   if (button) button.disabled = true;
   try {
-    if (!await setLicense(raw, { preserveActive: true })) {
+    const existing = licenseRecords().find(record => record.key === raw.replace(/\s+/g, ''));
+    if (!await setLicense(raw, { preserveActive: true, savedActivation: existing?.activation })) {
       licMsg = { ok: false, t: LIC_MSG[licenseReason()] || LIC_MSG.format };
       const el = $('#bc-licmsg');
       if (el) { el.textContent = licMsg.t; el.className = 'bc-licmsg bad'; }
@@ -2234,9 +2327,22 @@ async function applyLicense() {
 
 function storeLicense() {
   const slot = extSlot();
-  slot.license = licenseKey();
-  if (licenseActivation()) slot.licenseActivation = licenseActivation();
-  else delete slot.licenseActivation;
+  slot.licenses = licenseRecords();
+  delete slot.license;
+  delete slot.licenseActivation;
+}
+
+async function restoreLicenses(slot) {
+  const records = Array.isArray(slot?.licenses) ? slot.licenses.slice(0, 2) :
+    slot?.license ? [{ key: slot.license, activation: slot.licenseActivation }] : [];
+  let changed = false;
+  for (const record of records) {
+    if (!record?.key) continue;
+    changed = await setLicense(record.key, {
+      preserveActive: true, onlyMissing: true, savedActivation: record.activation,
+    }) || changed;
+  }
+  return changed;
 }
 
 let licSyncAt = 0;
@@ -2252,15 +2358,7 @@ async function syncLicense() {
     const data = await res.json();
     const saved = typeof data?.settings === 'string' ? JSON.parse(data.settings) : data?.settings;
     const remoteSlot = saved?.extension_settings?.[EXT_ID];
-    const remote = remoteSlot?.license;
-    if (premium()) {
-      if (!remote || (remote === licenseKey() && licenseActivation() && remoteSlot.licenseActivation?.key !== remote)) {
-        storeLicense();
-        saveApi();
-      }
-      return;
-    }
-    if (licBusy || typeof remote !== 'string' || !remote || !await setLicense(remote, { preserveActive: true, savedActivation: remoteSlot?.licenseActivation })) return;
+    if (licBusy || !await restoreLicenses(remoteSlot)) return;
     storeLicense();
     saveApi();
     applyCfg();
@@ -2273,20 +2371,27 @@ async function syncLicense() {
 }
 
 function skinCardHtml() {
-  const tile = (id, title, who, img, on, lock) => `<button class="bc-skin${on ? ' on' : ''}${lock ? ' lock' : ''}" ${lock ? 'disabled' : `data-act="setSkin" data-v="${id}"`}>
+  const hsr = !!cur.journey;
+  const entitled = themeEntitled(hsr ? 'hsr' : 'hi3');
+  const tile = (id, title, img, on, lock) => `<button type="button" data-pack="${id}" class="bc-skin${on ? ' on' : ''}${lock ? ' lock' : ''}" aria-pressed="${on}" ${lock ? 'aria-label="' + esc(title) + ' · ดูตัวอย่าง"' : ''} data-act="${lock ? 'previewSkin' : 'setSkin'}" data-v="${id}">
       <span class="bc-skth">${img ? `<img src="${esc(THEMES_URL + img)}" alt="" loading="lazy" decoding="async" draggable="false">` : ''}</span>${lock ? '<i class="fa-solid fa-lock bc-lk"></i>' : ''}
-      <span class="bc-skn"><b>${esc(title)}</b><em>${esc(who)}</em>${lock ? '<u>สำหรับ Premium Version</u>' : ''}</span></button>`;
-  const active = premium() ? cfg.skin : 'default';
-  const tiles = [tile('default', 'ปกติ', 'Console', '', active === 'default', false)]
-    .concat(SKINS.map((k) => tile(k.id, k.title, k.who, k.wall, premium() && active === k.id, !premium())));
-  return `<div class="bc-card"><div class="bc-line"><div class="bc-h">สกินตัวละคร</div><span class="bc-ed${premium() ? '' : ' free'}">${premium() ? 'Premium' : 'Free'}</span></div>
-      <div class="bc-skins">${tiles.join('')}</div></div>
-    <div class="bc-card"><div class="bc-h">วอลเปเปอร์ของธีมนี้</div>
-      <div class="bc-wallprev">${wallCustom() || (premium() && cfg.skin !== 'default') ? '' : 'ยังไม่มีวอลเปเปอร์'}</div>
-      <div class="bc-seg"><button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallPick"${premium() ? '' : ' disabled'}><i class="fa-solid fa-image"></i>เลือกรูป</button>
-        <button class="bc-segb${premium() ? '' : ' lock'}" data-act="wallClear"${premium() ? '' : ' disabled'}><i class="fa-solid fa-rotate-left"></i>ใช้ของสกิน</button></div>
-      ${premium() ? '' : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>
+      ${hsrSkinById(id) ? `<span class="rail-pack-icons" aria-hidden="true">${['map','phone','settings'].map(app => `<img src="${esc(appIcon(id,app))}" alt="">`).join('')}</span>` : ''}
+      <span class="bc-skn"><b>${esc(title)}</b></span></button>`;
+  const active = activeSkin();
+  const tiles = [tile('default', 'ปกติ', '', active === 'default', false)]
+    .concat((hsr ? HSR_SKINS : SKINS).map((k) => tile(k.id, k.title, k.wall, active === k.id, !entitled)));
+  const wallCard = (screen, label) => `
+    <div class="bc-card"><div class="bc-h">${label}</div>
+      <div class="bc-wallprev" data-screen="${screen}">${wallCustom() || active !== 'default' ? '' : 'ยังไม่มีวอลเปเปอร์'}</div>
+      <div class="bc-seg"><button class="bc-segb${entitled ? '' : ' lock'}" data-act="wallPick" data-screen="${screen}"${entitled ? '' : ' disabled'}><i class="fa-solid fa-image"></i>เลือกรูป</button>
+        <button class="bc-segb${entitled ? '' : ' lock'}" data-act="wallClear" data-screen="${screen}"${entitled ? '' : ' disabled'}><i class="fa-solid fa-rotate-left"></i>ใช้ของสกิน</button></div>
+      ${entitled ? '' : '<div class="bc-locknote"><i class="fa-solid fa-lock"></i>สำหรับ Premium Version</div>'}</div>
 `;
+  const wallpaper = !hsr ? wallCard('home', 'วอลเปเปอร์ของธีมนี้') : active === 'default' ? '' :
+    wallCard('home', 'วอลเปเปอร์หน้าหลัก') + wallCard('lock', 'วอลเปเปอร์หน้าจอล็อก');
+  const unlock = !entitled ? `<button type="button" class="bc-btn sm ghost" data-act="settingsSection" data-id="account">ใช้ Itemcode</button>` : '';
+  return `<div class="bc-card"><div class="bc-line"><div class="bc-h">${hsr ? 'HSR Premium Set' : 'สกินตัวละคร'}</div><span class="bc-ed${premium() ? '' : ' free'}">${premium() ? 'Premium' : 'Free'}</span></div>
+      <div class="bc-skins">${tiles.join('')}</div>${unlock}</div>${hsr && hsrSkinById(active) ? `<label class="bc-card rail-fx-option"><input type="checkbox" data-act="railEffects" ${extSlot().railEffects !== false ? 'checked' : ''}> เอฟเฟกต์ปลดล็อกและเปิดแอป</label>` : ''}${wallpaper}`;
 }
 
 function memorySettings() {
@@ -2306,9 +2411,9 @@ function consoleSettings() {
       <div class="bc-rng"><div class="bc-line"><span>ความโปร่งใส</span><b id="bc-v-transparent">${cfg.transparent}%</b></div>
         <input type="range" min="0" max="70" step="5" value="${cfg.transparent}" data-cfg="transparent"></div>
       <button class="bc-segb" data-act="fabReset"><i class="fa-solid fa-arrows-to-dot"></i>รีเซ็ตตำแหน่งและขนาดปุ่ม</button></div>
-    <div class="bc-card"><div class="bc-h">ซิงค์ข้อมูล</div>
+    ${cur.journey ? '' : `<div class="bc-card"><div class="bc-h">ซิงค์ข้อมูล</div>
       <button class="bc-segb" data-act="syncServer"><i class="fa-solid fa-cloud-arrow-down"></i>ซิงค์แต้ม/ตั้งค่ากับเซิร์ฟเวอร์</button>
-      <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>`;
+      <button class="bc-segb" data-act="syncNow"><i class="fa-solid fa-rotate"></i>โหลดข้อมูลล่าสุดจากแชท</button></div>`}`;
 }
 
 function roleplaySettings() {
@@ -2330,11 +2435,15 @@ function roleplaySettings() {
 
 function updateActions() {
   const { status } = updater.get();
-  const bot = botUpdater.get();
+  const bots = botUpdater.get();
+  const hsr = cur.journey && bots.find(bot => bot.folder === 'hsr');
   const available = ['available', 'installed', 'failed', 'forbidden'].includes(status);
   return `<div class="bc-btns bc-update-links">
     ${available ? '<button type="button" class="bc-btn sm" data-act="checkUpdate">อัปเดตส่วนเสริม</button>' : ''}
-    ${bot ? `<button type="button" class="bc-btn sm ghost" data-act="botUpdate">อัปเดตบอท · ${esc(bot.name)}</button>` : ''}</div>`;
+    ${cur.journey ? `<button type="button" class="bc-btn sm ghost" data-act="checkHsrCard">
+      ${hsr ? 'อัปเดตการ์ด HSR · ' + esc(hsr.version) : 'ตรวจสอบอัปเดตการ์ด HSR'}</button>` : ''}
+    ${(cur.journey ? [] : bots.filter(bot => bot.folder !== 'hsr')).map(bot => `<button type="button" class="bc-btn sm ghost" data-act="botUpdate" data-avatar="${esc(bot.avatar)}">
+      อัปเดตบอท · ${esc(bot.name)}</button>`).join('')}</div>`;
 }
 
 function viewSettings() {
@@ -2350,23 +2459,154 @@ function viewSettings() {
   return `<nav class="bc-settings-sections" aria-label="หมวดการตั้งค่า">${buttons}</nav>${current[2]()}`;
 }
 
-function viewHome() {
+function hsrPins() {
+  const pins = getMeta()?.hsr?.pins;
+  return new Set(Array.isArray(pins) ? pins : []);
+}
+
+function hsrProfileData() {
+  const player = cur.state.player || {};
+  const meta = getMeta();
+  const name = userName();
+  const pic = meta.me.avatar || getPersonaAvatarUrl();
+  const values = { '@name': name, title: player.title || '', money: String(balanceOf()) };
+  const labels = { '@name': 'ชื่อของคุณ', title: 'ฉายา', money: 'Credits' };
+  const editor = Object.hasOwn(values, editing) ? `<div class="hsr-editor" data-form>
+    <input class="bc-input" aria-label="${labels[editing]}" placeholder="${labels[editing]}" value="${esc(values[editing])}">
+    <button type="button" class="bc-btn sm" data-primary data-act="save">บันทึก</button>
+    <button type="button" class="bc-btn sm ghost" data-act="cancel">ยกเลิก</button></div>` : '';
+  const tracked = cur.journey.missions.get(meta.hsr?.tracked);
+  return {
+    player,
+    portrait: portrait([pic], esc(firstChar(name).toUpperCase()), 'me', ''),
+    name, title: player.title, money: fmtMoney(balanceOf()), editor, imageMenu: imgMenuHtml('me'),
+    location: cur.journey.locations.get(cur.journey.current)?.name || player.location,
+    tracked: tracked && !missionFinished(tracked) ? tracked : null,
+  };
+}
+
+function viewHsrHome(id = activeSkin()) {
+  const skin = hsrSkinById(id);
+  return skin ? launcher(skin, HSR_TABS, currentStoryCards()) : hsrHome(hsrProfileData());
+}
+
+function currentStoryCards() {
+  return storyCards(cur.journey, cur.state.player || {}, getMeta(), cur.appts || []);
+}
+
+function phoneEffect(origin) {
+  if (!hsrSkinById(activeSkin()) || extSlot().railEffects === false || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const fx = panel.querySelector('.rail-effect');
+  const bounds = panel.getBoundingClientRect();
+  const at = origin.getBoundingClientRect();
+  fx.style.setProperty('--fx-x', (at.left + at.width / 2 - bounds.left) + 'px');
+  fx.style.setProperty('--fx-y', (at.top + at.height / 2 - bounds.top) + 'px');
+  fx.getAnimations().forEach(a => a.cancel());
+  fx.animate([{ opacity: 0, transform: 'scale(.55)' }, { opacity: .78, offset: .3 }, { opacity: 0, transform: 'scale(1.35)' }], { duration: 360, easing: 'ease-out' });
+}
+
+function sendHsrAction(text) {
+  const composer = document.querySelector('#send_textarea');
+  const send = document.querySelector('#send_but');
+  if (!composer || !send || composer.disabled || send.disabled || isGenerating()) {
+    toast('warning', 'รอให้แชทพร้อมก่อนเริ่มฉาก');
+    return;
+  }
+  if (composer.value.trim()) {
+    toast('warning', 'มีข้อความร่างอยู่ในแชท กรุณาจัดการข้อความนั้นก่อน');
+    return;
+  }
+  composer.value = text;
+  composer.dispatchEvent(new Event('input', { bubbles: true }));
+  setOpen(false);
+  send.click();
+}
+
+function handleHsrAction({ act, id, choice }, meta) {
+  if (!cur?.journey || !meta || ctx().chatMetadata !== lastMd || resolveProfile()?.id !== 'hsr') return;
+  const journey = cur.journey = readJourney(ctx().chat || []);
+  switch (act) {
+    case 'hsrMissionPlace':
+    case 'hsrSelectPlace':
+      if (!journey.locations.has(id)) return;
+      hsrLocation = id;
+      tab = 'map';
+      render();
+      break;
+    case 'hsrTravel': {
+      const route = journey.routes.get(journey.current)?.get(id);
+      if (!route || route.locked || !journey.locations.has(id)) return;
+      sendHsrAction(`ฉันเริ่มเดินทางไปยัง ${journey.locations.get(id).name}${route.minutes ? ` ตามเส้นทางที่ใช้เวลา ${route.minutes} นาที` : ''}`);
+      break;
+    }
+    case 'hsrChoose': {
+      const mission = journey.missions.get(id);
+      if (!mission || missionFinished(mission) || mission.choice) return;
+      const option = mission.choices.find(item => item.id === choice);
+      if (option) sendHsrAction(`สำหรับภารกิจ “${mission.title}” ฉันเลือกแนวทาง “${option.label}”`);
+      break;
+    }
+    case 'hsrTrack': {
+      const mission = journey.missions.get(id);
+      if (!mission || missionFinished(mission)) return;
+      const settings = (meta.hsr ||= {});
+      settings.tracked = settings.tracked === id ? '' : id;
+      save();
+      render();
+      break;
+    }
+    case 'hsrPin': {
+      if (!journey.journal.has(id)) return;
+      const pins = hsrPins();
+      if (pins.has(id)) pins.delete(id);
+      else pins.add(id);
+      (meta.hsr ||= {}).pins = [...pins];
+      save();
+      render();
+      break;
+    }
+    case 'hsrSource': {
+      const entry = journey.journal.get(id);
+      if (!entry) return;
+      const selector = `#chat .mes[mesid="${entry.turn}"]`;
+      let message = document.querySelector(selector);
+      for (let batch = 0; !message && batch < 8; batch++) {
+        const moreButton = document.querySelector('#chat #show_more_messages');
+        if (!moreButton) break;
+        const first = document.querySelector('#chat .mes');
+        moreButton.click();
+        message = document.querySelector(selector);
+        if (first === document.querySelector('#chat .mes')) break;
+      }
+      if (!message) {
+        toast('info', `โหลดข้อความเก่าในแชทก่อนเปิดข้อความที่ ${entry.turn + 1}`);
+        return;
+      }
+      setOpen(false);
+      message.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      break;
+    }
+  }
+}
+
+function viewHome(skin = activeSkin()) {
+  if (cur.journey) return viewHsrHome(skin);
   const p = cur?.state?.player || {};
   const now = new Date();
   const clock = String(p.time || '').trim() || now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
   const date = String(p.date || '').trim() || now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short' });
   const where = [p.location, p.weather].map((x) => String(x || '').trim()).filter(Boolean).join(' · ');
   const apps = TABS.map((t) => `<button class="bc-app" data-tab="${t.id}">${t.id === 'phone' ? '<b class="bc-badge" hidden></b>' : ''}<span class="bc-ai"><i class="fa-solid ${t.icon}"></i></span><span class="bc-al">${esc(t.label)}</span></button>`).join('');
-  const meiMode = premium() && cfg.skin === 'mei';
-  const kianaMode = premium() && cfg.skin === 'kiana';
-  if (premium() && cfg.skin === 'seele') {
+  const meiMode = skin === 'mei';
+  const kianaMode = skin === 'kiana';
+  if (skin === 'seele') {
     return `<div class="bc-home rebirth-home">
       <header class="rebirth-title"><div><span>Seele Vollerei</span><h2 lang="en">Herrscher of Rebirth</h2></div>
         <div class="rebirth-time"><strong>${esc(clock)}</strong><small>${esc(date)}</small></div></header>
       <nav class="rebirth-wings" aria-label="เมนูหลัก">${apps}</nav>
       ${where ? `<p class="folio-place">${esc(where)}</p>` : ''}</div>`;
   }
-  if (premium() && cfg.skin === 'fenghuang') {
+  if (skin === 'fenghuang') {
     return `<div class="bc-home phoenix-home">
       <header class="phoenix-sky"><h2 lang="en">Fenghuang</h2><div class="phoenix-sunset">
         <strong>${esc(clock)}</strong><span>${esc(date)}</span></div></header>
@@ -2374,7 +2614,7 @@ function viewHome() {
       ${where ? `<p class="hua-place">${esc(where)}</p>` : ''}
     </div>`;
   }
-  if (premium() && cfg.skin === 'sentience') {
+  if (skin === 'sentience') {
     return `<div class="bc-home sentience-home">
       <header class="ink-spine"><h2 lang="en">Sentience</h2><strong>${esc(clock)}</strong></header>
       <section class="ink-sheet"><p class="ink-date">${esc(date)}</p>
@@ -2383,7 +2623,7 @@ function viewHome() {
       </section>
     </div>`;
   }
-  if (premium() && cfg.skin === 'theresa') {
+  if (skin === 'theresa') {
     return `<div class="bc-home lunar-book">
       <header class="lunar-cover">
         <span class="lunar-moon" aria-hidden="true"></span>
@@ -2395,7 +2635,7 @@ function viewHome() {
       <nav class="lunar-index" aria-label="เมนูหลัก">${apps}</nav>
     </div>`;
   }
-  if (premium() && cfg.skin === 'bronya') {
+  if (skin === 'bronya') {
     return `<div class="bc-home bronya-home">
       <header class="bc-night-heading">
         <span>Bronya Zaychik</span><h2 lang="en">Heart of the Night</h2>
@@ -2424,10 +2664,74 @@ function viewHome() {
     <header class="bc-widget"><div class="bc-clock">${esc(clock)}</div><div class="bc-wd"><b>${esc(date)}</b>${where ? `<span>${esc(where)}</span>` : ''}</div></header>
     <nav class="bc-apps" aria-label="เมนูหลัก">${apps}</nav></div>`;
 }
+let phoneLocked = false;
+let lockClockTimer;
+
+function paintLockClock() {
+  const now = new Date();
+  const time = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  const bar = panel.querySelector('.rail-status');
+  bar.querySelector('time').textContent = time;
+  bar.classList.toggle('offline', !navigator.onLine);
+  const clock = panel?.querySelector('.hsr-lock time');
+  if (!clock) return;
+  clock.textContent = time;
+  clock.previousElementSibling.textContent = now.toLocaleDateString('th-TH', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
 function render() {
   if (!panel) return;
   const body = $('#bc-body');
-  panel.classList.toggle('at-home', tab === 'home');
+  const preview = open && cur ? skinPreview : null;
+  const previewBar = $('.bc-preview-bar');
+  if (!preview && panel.classList.contains('bc-previewing')) applySkin();
+  previewBar.hidden = !preview;
+  panel.classList.toggle('bc-previewing', !!preview);
+  const phoneSkin = open && cur?.journey && hsrSkinById(preview?.id || activeSkin());
+  const lockedSkin = (preview ? preview.locked : phoneLocked) && phoneSkin;
+  if (phoneSkin) {
+    paintLockClock();
+    lockClockTimer ??= setInterval(paintLockClock, 10000);
+  } else {
+    clearInterval(lockClockTimer);
+    lockClockTimer = undefined;
+  }
+  panel.classList.toggle('at-home', !!preview || !!lockedSkin || tab === 'home');
+  panel.classList.toggle('hsr-locked', !!lockedSkin);
+  if (preview) {
+    $('.bc-skin-dock').hidden = true;
+    $('[data-act="previewScreen"]').hidden = !phoneSkin;
+    $('[data-act="previewScreen"]').textContent = preview.locked ? 'ดูหน้าหลัก' : 'ดูหน้าล็อก';
+    const html = lockedSkin
+      ? `<section class="hsr-lock"><div class="hsr-lock-date"></div><time></time><div class="rail-lock-stories">${lockCards(lockedSkin, currentStoryCards())}</div></section>`
+      : viewHome(preview.id);
+    if (body._bcHtml !== html) {
+      body.classList.remove('phone');
+      body.innerHTML = html;
+      body._bcHtml = html;
+      for (const child of body.children) child.inert = true;
+      body.scrollTop = 0;
+    }
+    if (phoneSkin) paintLockClock();
+    updateBadges();
+    return;
+  }
+  if (lockedSkin) {
+    panel.querySelector('.bc-skin-dock').hidden = true;
+    $('#bc-title').textContent = lockedSkin.title;
+    if (!body.querySelector('.hsr-lock')) {
+      body.classList.remove('phone');
+      body._bcHtml = null;
+      body.innerHTML = '<section class="hsr-lock"><div class="hsr-lock-date"></div><time></time><div class="rail-lock-stories"></div><button type="button" data-act="unlockPhone"><i class="fa-solid fa-lock-open"></i> แตะเพื่อปลดล็อก</button></section>';
+      body.scrollTop = 0;
+      body.querySelector('button').focus({ preventScroll: true });
+    }
+    const stories = body.querySelector('.rail-lock-stories');
+    const html = lockCards(lockedSkin, currentStoryCards());
+    if (stories._html !== html) { stories.innerHTML = html; stories._html = html; }
+    paintLockClock();
+    return;
+  }
   const dock = panel.querySelector('.bc-skin-dock');
   const dockTab = tab === 'bag' ? 'player' : tab === 'decorations' ? 'shop' : tab;
   const showDock = !!cur && !!skinById(panel.dataset.skin) && tab !== 'home';
@@ -2451,10 +2755,10 @@ function render() {
     updateBadges();
     return;
   }
-  const app = TABS.find((t) => t.id === tab);
+  const app = (cur.journey ? HSR_TABS : TABS).find((t) => t.id === tab);
   $('#bc-title').textContent = tab === 'bag' ? 'คลังไอเทม' : tab === 'decorations' ? 'ร้านแต้ม' : app?.label || cur.profile.label;
   const back = $('#bc-back');
-  back.title = tab === 'bag' ? 'กลับหน้าผู้เล่น' : tab === 'decorations' ? 'กลับร้านค้า' : 'กลับหน้าหลัก';
+  back.title = tab === 'bag' && !cur.journey ? 'กลับหน้าผู้เล่น' : tab === 'decorations' ? 'กลับร้านค้า' : 'กลับหน้าหลัก';
   back.setAttribute('aria-label', back.title);
   const ta0 = $('.bcp-ta');
   const box0 = $('.bcp-msgs');
@@ -2473,6 +2777,12 @@ function render() {
   const top0 = box0 ? box0.scrollTop : 0;
   body.classList.toggle('phone', tab === 'phone');
   const views = { home: viewHome, player: viewPlayer, bag: viewBag, rel: viewRel, phone: viewPhone, shop: viewShop, decorations: viewDecorations, mission: viewMission, appt: viewAppt, ui: viewUi, settings: viewSettings };
+  if (cur.journey) Object.assign(views, {
+    map: () => hsrMap(cur.journey, hsrLocation),
+    mission: () => hsrMissions(cur.journey, getMeta().hsr?.tracked),
+    journal: () => hsrJournal(cur.journey, hsrPins()),
+    skills: viewSkills,
+  });
   let html;
   try {
     html = views[tab]();
@@ -2619,14 +2929,22 @@ function updateCovered() {
 }
 
 function setOpen(v) {
+  const endedPreview = !v && !!skinPreview;
+  if (endedPreview) skinPreview = null;
+  if (v !== open) phoneLocked = v;
+  if (!v) {
+    clearInterval(lockClockTimer);
+    lockClockTimer = undefined;
+  }
   open = v;
+  if (endedPreview) { applySkin(); render(); }
   applyLayout();
   panel.classList.toggle('open', v);
   fab.classList.toggle('active', v);
   updateCovered();
   setTimeout(updateCovered, 260);
   if (v) {
-    tab = 'home';
+    if (!cur?.journey) tab = 'home';
     editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null;
     phoneForm = false; phoneSel = null; thoughtOpen = null; shopForm = null; missionForm = null; apptForm = null; giftFor = null;
     hideNotify();
@@ -2635,7 +2953,7 @@ function setOpen(v) {
   }
 }
 
-const CFG_DEFAULT = { theme: 'dark', lock: true, size: 52, transparent: 0, skin: 'default' };
+const CFG_DEFAULT = { theme: 'dark', lock: true, size: 52, transparent: 0, skin: 'default', hsrSkin: 'default' };
 let cfg = { ...CFG_DEFAULT };
 let fabPos = { x: 1, y: 0.4 };
 
@@ -2651,6 +2969,7 @@ function loadCfg() {
   cfg.size = clampN(Number(cfg.size) || CFG_DEFAULT.size, 36, 88);
   cfg.transparent = clampN(Number(cfg.transparent) || 0, 0, 70);
   if (!skinById(cfg.skin)) cfg.skin = 'default';
+  if (!hsrSkinById(cfg.hsrSkin)) cfg.hsrSkin = 'default';
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) fabPos = { x: clampN(p.x, 0, 1), y: clampN(p.y, 0, 1) };
@@ -2716,13 +3035,16 @@ const extSlot = () => {
   const all = ctx().extensionSettings;
   return all[EXT_ID] || (all[EXT_ID] = {});
 };
-const SYNC_CFG = ['theme', 'skin', 'transparent', 'size', 'lock'];
+const SYNC_CFG = ['theme', 'skin', 'hsrSkin', 'transparent', 'size', 'lock'];
 const LOCAL_WALL = 'bc_wall_local:';
 let prefs;
 const pendingPrefs = new Map();
 let pushTimer = 0;
 
-const activeSkin = () => (premium() && skinById(cfg.skin) ? cfg.skin : 'default');
+function activeSkin() {
+  if (!themeEntitled(cur?.journey ? 'hsr' : 'hi3')) return 'default';
+  return (cur?.journey ? hsrSkinById(cfg.hsrSkin) : skinById(cfg.skin))?.id || 'default';
+}
 const wallVersion = id => (prefs ? prefValue(prefs.get(), 'wall.' + id, '') : '');
 
 function wallFor(id) {
@@ -2734,7 +3056,7 @@ function wallFor(id) {
   const version = wallVersion(id);
   return version ? serverFileUrl(`bc_wall_${id}_${version}.jpg`) : '';
 }
-const wallCustom = () => wallFor(activeSkin());
+const wallCustom = () => cur?.journey && activeSkin() === 'default' ? '' : wallFor(activeSkin());
 
 function pullPrefs() {
   if (!prefs) return false;
@@ -2746,6 +3068,7 @@ function pullPrefs() {
     if (value === undefined) continue;
     if (key === 'theme') value = value === 'light' ? 'light' : 'dark';
     else if (key === 'skin') value = skinById(value) ? value : 'default';
+    else if (key === 'hsrSkin') value = hsrSkinById(value) ? value : 'default';
     else if (key === 'size') value = clampN(Number(value) || CFG_DEFAULT.size, 36, 88);
     else if (key === 'lock') value = value !== false;
     else value = clampN(Number(value) || 0, 0, 70);
@@ -2774,9 +3097,10 @@ function pushPrefs(keys, delay = 500) {
 }
 
 function onPrefsChanged() {
+  const previousSkin = panel?.dataset.skin;
   if (pullPrefs()) saveCfg();
   applyCfg();
-  if (open && tab === 'settings' && !formOpen()) render();
+  if (open && (previousSkin !== panel?.dataset.skin || (tab === 'settings' && !formOpen()))) render();
 }
 
 async function saveWall(id, dataUrl) {
@@ -2869,8 +3193,7 @@ function syncChatRegex() {
   } catch (error) { console.warn('[Bot Console] chat Regex palette failed', error); }
 }
 
-function applyChatSkin() {
-  const id = premium() && skinById(cfg.skin) ? cfg.skin : 'default';
+function applyChatSkin(id) {
   if (chatSkinId === id) return;
   chatSkinId = id;
   const palette = uiPalette(id);
@@ -2884,17 +3207,38 @@ function applyChatSkin() {
   syncChatRegex();
 }
 
+function applyDrawerTheme(drawer = document.getElementById('bc-api-drawer')) {
+  if (!drawer) return;
+  const profile = cur?.profile.id || '';
+  drawer.dataset.profile = profile;
+  drawer.dataset.theme = profile === 'hsr' ? 'dark' : cfg.theme;
+  drawer.dataset.skin = activeSkin();
+  drawer.querySelector('.bcx-title').textContent = profile === 'hsr' ? 'Honkai Star Rail Console' : "Seito's bot Console";
+}
+
 function applySkin() {
-  const id = premium() && skinById(cfg.skin) ? cfg.skin : 'default';
-  const meta = skinById(id);
-  if (meta) loadSkinAssets(id);
-  for (const el of [panel, notify, document.getElementById('bc-api-drawer')]) if (el) el.dataset.skin = id;
-  if (fab) delete fab.dataset.skin;
-  applyChatSkin();
-  const custom = wallCustom();
+  const hsr = cur?.profile.id === 'hsr';
+  const id = activeSkin();
+  const displayId = skinPreview?.id || id;
+  const meta = hsr ? hsrSkinById(displayId) : skinById(displayId);
+  if (meta && !hsr) loadSkinAssets(displayId);
+  for (const el of [panel, notify]) {
+    if (!el) continue;
+    el.dataset.skin = el === panel ? displayId : id;
+    el.dataset.theme = hsr ? 'dark' : cfg.theme;
+  }
+  applyDrawerTheme();
+  const launcherIcon = fab?.querySelector('.bc-hsr-icon img');
+  const launcherSrc = hsr && hsrSkinById(id) ? appIcon(id, 'console') : HSR_ICON;
+  if (launcherIcon && launcherIcon.src !== launcherSrc) launcherIcon.src = launcherSrc;
+  if (fab) fab.dataset.skin = hsr && hsrSkinById(id) ? id : '';
+  applyChatSkin(hsr ? 'default' : id);
+  const custom = skinPreview ? '' : wallCustom();
   panel?.classList.toggle('custom-wall', !!custom);
   const wall = custom ? `url("${custom}")` : meta?.wall ? `url("${THEMES_URL}${meta.wall}")` : '';
   if (!panel) return;
+  if (hsr && meta) panel.style.setProperty('--rail-lock-wall', `url("${(!skinPreview && wallFor(id + '-lock')) || meta.lockWall}")`);
+  else panel.style.removeProperty('--rail-lock-wall');
   if (wall) panel.style.setProperty('--bc-wall', wall);
   else panel.style.removeProperty('--bc-wall');
   panel.classList.toggle('has-wall', !!wall);
@@ -2936,10 +3280,6 @@ async function packWallpaper(file) {
 }
 
 function applyCfg() {
-  if (panel) panel.dataset.theme = cfg.theme;
-  if (notify) notify.dataset.theme = cfg.theme;
-  const drawer = document.getElementById('bc-api-drawer');
-  if (drawer) drawer.dataset.theme = cfg.theme;
   if (fab) {
     fab.dataset.theme = cfg.theme;
     fab.style.setProperty('--bc-fab-size', `${cfg.size}px`);
@@ -2953,8 +3293,10 @@ function mountUi() {
   fab = document.createElement('div');
   fab.id = 'bc-fab';
   fab.title = "Seito's bot Console";
-  fab.innerHTML = `<span class="bc-hex"><i class="fa-solid fa-terminal"></i><img src="${esc(ICON_URL)}" alt="" draggable="false"></span>`;
-  fab.querySelector('img').addEventListener('error', (e) => e.target.remove());
+  fab.innerHTML = `
+    <span class="bc-hex"><i class="fa-solid fa-terminal"></i><img src="${esc(HI3_ICON)}" alt="" draggable="false"></span>
+    <span class="bc-hsr-icon"><i class="fa-solid fa-terminal"></i><img src="${esc(HSR_ICON)}" alt="" draggable="false"></span>`;
+  for (const img of fab.querySelectorAll('img')) img.addEventListener('error', () => img.remove());
   loadCfg();
   fab.style.display = 'none';
   document.body.appendChild(fab);
@@ -2962,15 +3304,18 @@ function mountUi() {
   panel = document.createElement('div');
   panel.id = 'bc-panel';
   panel.innerHTML = `
+    <div class="rail-status"><time></time><span class="rail-island" aria-hidden="true"></span><span class="rail-status-right"><i class="fa-solid fa-wifi" aria-hidden="true"></i><button type="button" data-act="close" aria-label="ปิดคอนโซล">×</button></span></div>
     <div class="bc-head"><span class="bc-head-decoration" aria-hidden="true"></span><button class="bc-ico bc-back" id="bc-back" data-act="home" title="กลับหน้าหลัก"><i class="fa-solid fa-chevron-left"></i></button><span class="bc-dot"></span><b id="bc-title">Seito's bot Console</b>
       <button class="bc-ico" data-act="close" title="ปิด"><i class="fa-solid fa-xmark"></i></button></div>
     <div class="bc-mei-atmosphere bc-kiana-atmosphere bc-bronya-atmosphere" aria-hidden="true"></div>
-    <div id="bc-body"></div>
+    <div id="bc-body"></div><div class="rail-effect" aria-hidden="true"></div>
+    <div class="bc-preview-bar" hidden><span>กำลังดูตัวอย่าง</span><button type="button" class="bc-btn sm ghost" data-act="previewScreen"></button><button type="button" class="bc-btn sm" data-act="exitPreview">ออกจากพรีวิว</button></div>
     <nav class="bc-skin-dock" aria-label="สลับหน้า" hidden>${TABS.map(t =>
       `<button type="button" data-tab="${t.id}" title="${esc(t.label)}" aria-label="${esc(t.label)}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i></button>`
     ).join('')}</nav>
     <button class="bc-homebar" data-act="home" title="หน้าหลัก"><i></i></button><div class="bc-scan"></div>`;
   document.body.appendChild(panel);
+  mountLauncher(panel, render);
   mountNotify();
   escapeBodyContext();
   window.addEventListener('resize', layoutPanel);
@@ -3116,6 +3461,11 @@ function mountUi() {
   });
   panel.addEventListener('change', (e) => {
     const act = e.target?.dataset?.act;
+    if (act === 'railEffects' && hsrSkinById(activeSkin())) {
+      extSlot().railEffects = e.target.checked;
+      saveApi();
+      return;
+    }
     if (act === 'memOn') {
       if (!premium()) return;
       extSlot().mem = e.target.checked;
@@ -3143,21 +3493,66 @@ function mountUi() {
       toggleThought(relCard.dataset.rel);
       return;
     }
-    const t = e.target.closest('[data-act],[data-tab]');
+    const t = e.target.closest('[data-act],[data-tab],[data-story]');
     if (!t) return;
+    if (skinPreview && !['previewScreen', 'exitPreview'].includes(t.dataset.act)) return;
+    if (t.dataset.story && cur?.journey && hsrSkinById(activeSkin())) {
+      const card = currentStoryCards()[t.dataset.story];
+      if (!card) return;
+      phoneEffect(t);
+      phoneLocked = false;
+      if (card.sender) openThread(card.sender);
+      else {
+        if (card.tab === 'map') hsrLocation = card.place;
+        if (card.tab === 'phone') phoneName = null;
+        openTab(card.tab);
+      }
+      return;
+    }
     if (t.dataset.tab) {
       if (t.dataset.tab === tab) return;
+      if (t.closest('.rail-launcher')) phoneEffect(t);
       tab = t.dataset.tab; editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null; phoneForm = false; phoneSel = null; shopForm = null; missionForm = null; apptForm = null; giftFor = null;
       if (tab === 'phone' && phoneName) phoneStick = true;
       render();
       return;
     }
     const meta = getMeta();
+    if (t.dataset.act?.startsWith('hsr')) {
+      handleHsrAction(t.dataset, meta);
+      return;
+    }
     switch (t.dataset.act) {
+      case 'previewSkin': {
+        const id = t.dataset.v;
+        if (!(cur?.journey ? hsrSkinById(id) : skinById(id))) break;
+        skinPreview = { id, locked: false };
+        hideNotify();
+        applySkin();
+        render();
+        $('[data-act="exitPreview"]').focus();
+        break;
+      }
+      case 'previewScreen':
+        if (skinPreview && cur?.journey) { skinPreview.locked = !skinPreview.locked; render(); }
+        break;
+      case 'exitPreview': {
+        const id = skinPreview?.id;
+        skinPreview = null;
+        applySkin();
+        render();
+        if (id) panel.querySelector('[data-pack="' + id + '"]')?.focus();
+        break;
+      }
+      case 'unlockPhone':
+        phoneEffect(t);
+        phoneLocked = false;
+        render();
+        break;
       case 'close': setOpen(false); break;
       case 'home':
         editing = null; imgMenu = null; urlFor = null; skillForm = null; relForm = null; phoneForm = false; phoneSel = null; shopForm = null; missionForm = null; apptForm = null; giftFor = null;
-        tab = tab === 'bag' ? 'player' : tab === 'decorations' ? 'shop' : 'home';
+        tab = tab === 'bag' && !cur?.journey ? 'player' : tab === 'decorations' ? 'shop' : 'home';
         render();
         break;
       case 'licApply': applyLicense(); break;
@@ -3166,7 +3561,10 @@ function mountUi() {
         render();
         break;
       case 'checkUpdate': updater.open(); break;
-      case 'botUpdate': botUpdater.open(); break;
+      case 'checkHsrCard':
+        void botUpdater.check('hsr').then(detail => { if (detail) toast('info', detail); });
+        break;
+      case 'botUpdate': botUpdater.open(t.dataset.avatar); break;
       case 'fabReset':
         fabPos = { x: 1, y: 0.4 };
         cfg.size = CFG_DEFAULT.size;
@@ -3180,17 +3578,23 @@ function mountUi() {
         render();
         toast('success', 'รีเซ็ตตำแหน่งและขนาดปุ่มแล้ว');
         break;
-      case 'setSkin':
-        if (!premium()) break;
-        cfg.skin = skinById(t.dataset.v) ? t.dataset.v : 'default';
+      case 'setSkin': {
+        if (!themeEntitled(cur?.journey ? 'hsr' : 'hi3') && t.dataset.v !== 'default') break;
+        const key = cur?.journey ? 'hsrSkin' : 'skin';
+        const skin = cur?.journey ? hsrSkinById(t.dataset.v) : skinById(t.dataset.v);
+        if (!skin && t.dataset.v !== 'default') break;
+        cfg[key] = skin?.id || 'default';
         saveCfg();
-        pushPrefs(['skin'], 0);
+        pushPrefs([key], 0);
         applyCfg();
         render();
         break;
+      }
       case 'wallPick': {
-        if (!premium()) break;
-        const id = activeSkin();
+        if (!themeEntitled(cur?.journey ? 'hsr' : 'hi3')) break;
+        const skinId = activeSkin();
+        if (cur?.journey && skinId === 'default') break;
+        const id = cur?.journey && t.dataset.screen === 'lock' ? skinId + '-lock' : skinId;
         const picked = pickFile();
         (async () => {
           const f = await picked;
@@ -3210,8 +3614,8 @@ function mountUi() {
         break;
       }
       case 'wallClear':
-        if (!premium()) break;
-        void clearWall(activeSkin()).then(() => { applySkin(); render(); });
+        if (!themeEntitled(cur?.journey ? 'hsr' : 'hi3') || (cur?.journey && activeSkin() === 'default')) break;
+        void clearWall(activeSkin() + (cur?.journey && t.dataset.screen === 'lock' ? '-lock' : '')).then(() => { applySkin(); render(); });
         break;
       case 'imgMenu': { const k = t.dataset.key; imgMenu = imgMenu === k ? null : k; urlFor = null; render(); break; }
       case 'upload': doUpload(t.dataset.key); break;
@@ -3522,9 +3926,11 @@ function mountUi() {
         if (!c) break;
         const box = t.closest('[data-form]');
         const get = (f) => box.querySelector(`[data-f="${f}"]`).value.trim();
-        c.type = get('type');
-        c.stage = get('stage');
-        c.bond = Math.max(0, Number(get('bond')) || 0);
+        const values = { type: get('type'), stage: get('stage'), bond: Math.max(0, Number(get('bond')) || 0) };
+        if (cur.journey) {
+          values.bond = Math.min(100, Math.round(values.bond));
+          meta.manual.push({ at: ctx().chat.length, patch: { rel: { [t.dataset.name]: { ...values, delta: 0 } } } });
+        } else Object.assign(c, values);
         relForm = null;
         rebuild();
         render();
@@ -3533,7 +3939,15 @@ function mountUi() {
       }
       case 'relDel':
         if (meta && confirm('ลบตัวละครที่เพิ่มไว้นี้?')) {
-          delete meta.customRel[t.dataset.name];
+          const name = t.dataset.name;
+          delete meta.customRel[name];
+          if (cur.journey) {
+            meta.manual = meta.manual.filter(entry => {
+              const patch = entry?.patch;
+              return !(patch?.rel && Object.keys(patch).length === 1 && Object.keys(patch.rel).length === 1 &&
+                Object.hasOwn(patch.rel, name));
+            });
+          }
           relForm = null;
           imgMenu = null;
           rebuild();
@@ -3653,6 +4067,7 @@ function bindEvents() {
     replacedReply = ['regenerate', 'swipe'].includes(type) && !last?.is_user && !last?.is_system ? last : null;
     if (ctx().chatMetadata !== lastMd || !cur) rebuild();
     applyTurnPrompt(quietTasks > 0);
+    applyJourneyPrompt(quietTasks > 0);
     applyShopCtx(quietTasks > 0);
   });
   if (et.MESSAGE_SENT) c.eventSource.on(et.MESSAGE_SENT, (id) => {
@@ -3660,6 +4075,7 @@ function bindEvents() {
     if (!msg?.is_user || msg.is_system || !resolveProfile()) return;
     (msg.extra ||= {}).bcBagTurn = true;
     applyTurnPrompt(quietTasks > 0);
+    if (cur?.journey && /<HSR_DOSSIER\b/i.test(msg.mes)) applyJourneyPrompt(quietTasks > 0);
   });
   if (et.GENERATION_ENDED) c.eventSource.on(et.GENERATION_ENDED, () => {
     generationType = '';
@@ -3709,11 +4125,11 @@ jQuery(() => {
   }).catch(() => {});
   initMemory();
   void startPrefs().catch(error => console.warn('[Bot Console] settings sync failed', error));
-  void setLicense(extSlot().license, { savedActivation: extSlot().licenseActivation }).then(async (valid) => {
-    if (!valid) { void syncLicense(); return; }
-    if (licenseActivation() && !extSlot().licenseActivation) { storeLicense(); saveApi(); }
+  void restoreLicenses(extSlot()).then(async (valid) => {
+    if (valid) { storeLicense(); saveApi(); }
     applyCfg();
     await initMemory();
     render();
+    void syncLicense();
   }).catch((e) => console.warn('[Bot Console] saved license verification failed', e));
 });

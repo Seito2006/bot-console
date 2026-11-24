@@ -59,14 +59,27 @@ export const CHARS = [
 
 const EXTS = ['jpg', 'png', 'jpeg', 'webp'];
 const BASE = new URL('./avatars/', import.meta.url).href;
+const HSR_ALIASES = new Map([
+  ['march7th', 'March.jpg'],
+  ['march7', 'March.jpg'],
+  ['march7ththehunt', 'March.jpg'],
+  ['มาร์ชเซเว่นธ์', 'March.jpg'],
+  ['มาร์ช7th', 'March.jpg'],
+  ['danhengimbibitorlunae', 'Dan Heng Imbibitor Lunae.jpg'],
+  ['danhengpermansorterrae', 'Dan Heng Permansor Terrae.jpg'],
+  ['oleg', 'hsr Oleg.jpg'],
+  ['pompom', 'Pompom.jpg'],
+  ['ปอมปอม', 'Pompom.jpg'],
+]);
 const isUrl = (s) => /^(https?:|data:|\/)/i.test(s);
 const hasExt = (s) => /\.(jpe?g|png|webp|gif)$/i.test(s);
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]+/g, '');
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export const fileUrl = (f) => BASE + encodeURIComponent(f);
+export const fileUrl = (f, pack = 'hi3') => `${BASE}${pack}/${encodeURIComponent(f)}`;
 
-export function findChar(name) {
+export function findChar(name, pack = 'hi3') {
+  if (pack !== 'hi3') return null;
   const ln = String(name || '').trim().toLowerCase();
   if (!ln) return null;
   return (
@@ -116,17 +129,20 @@ export function detectForm(c, avatarField, chat, depth = 80) {
   return null;
 }
 
-export function avatarCandidates(name, avatar) {
+export function avatarCandidates(name, avatar, pack = 'hi3') {
   const out = [];
   const n = String(name || '').trim();
   const a = String(avatar || '').trim();
-  if (a && isUrl(a)) out.push(a);
+  if (pack !== 'hsr' && a && isUrl(a)) out.push(a);
   if (a && !isUrl(a)) {
-    if (hasExt(a)) out.push(fileUrl(a));
-    else EXTS.forEach((e) => out.push(fileUrl(`${a}.${e}`)));
+    if (hasExt(a)) out.push(fileUrl(a, pack));
+    else EXTS.forEach((e) => out.push(fileUrl(`${a}.${e}`, pack)));
   }
   if (n) {
-    for (const nm of new Set([n, n.toLowerCase()])) EXTS.forEach((e) => out.push(fileUrl(`${nm}.${e}`)));
+    const alias = pack === 'hsr' ? HSR_ALIASES.get(norm(n)) : null;
+    if (alias) out.push(fileUrl(alias, pack));
+    for (const nm of new Set([n, n.toLowerCase()])) EXTS.forEach((e) => out.push(fileUrl(`${nm}.${e}`, pack)));
   }
+  if (pack === 'hsr' && a && isUrl(a)) out.push(a);
   return [...new Set(out)];
 }

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 74">
+  <defs><linearGradient id="g" x2=".8" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#7553a4"/><stop offset="1" stop-color="#302154"/></linearGradient></defs>
+  <rect x="1" y="1" width="72" height="72" rx="18" fill="url(#g)"/>
+  <rect x="4" y="4" width="66" height="66" rx="15" fill="none" stroke="#ffdc9e" opacity=".58"/>
+  <path d="m37 9 28 28-28 28L9 37z" fill="none" stroke="#dfbdfb" opacity=".23"/>
+  <path d="M32 22h10l1 5 5 2 4-1 4 8-4 3-1 5 2 4-7 5-4-3h-6l-4 3-7-5 2-4-1-5-4-3 4-8 4 1 5-2z M44 37a7 7 0 1 1-14 0 7 7 0 1 1 14 0" stroke="#302154" stroke-width="6.4" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+  <path d="M32 22h10l1 5 5 2 4-1 4 8-4 3-1 5 2 4-7 5-4-3h-6l-4 3-7-5 2-4-1-5-4-3 4-8 4 1 5-2z M44 37a7 7 0 1 1-14 0 7 7 0 1 1 14 0" stroke="#eee3ff" stroke-width="2.9" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+  <g transform="translate(56 15)" fill="#b395ff" stroke="#482c70" stroke-width="1"><ellipse cy="-4" rx="3.5" ry="5"/><ellipse cy="-4" rx="3.5" ry="5" transform="rotate(72)"/><ellipse cy="-4" rx="3.5" ry="5" transform="rotate(144)"/><ellipse cy="-4" rx="3.5" ry="5" transform="rotate(216)"/><ellipse cy="-4" rx="3.5" ry="5" transform="rotate(288)"/><circle r="2" fill="#ffe3a0"/></g><path d="M6 55q8 5 15-4-3 9-13 11z" fill="#c19be9"/><path d="m11 51 4 4-4 5-4-5z" fill="#ffde9d"/>
+</svg>
