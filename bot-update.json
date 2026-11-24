@@ -9,7 +9,8 @@
   },
   {
     "name": "Honkai Star Rail Rpg",
-    "version": "2.0.0",
+    "version": "2.1.1",
+    "preserveCardFrom": "2.0.0",
     "folder": "hsr",
     "file": "Honkai Star Rail Rpg.json",
     "lorebook": "HSR LB.json",

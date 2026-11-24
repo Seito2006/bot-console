@@ -2126,6 +2126,7 @@ function viewPhone() {
 const isDisplayOnly = (s) => !!s.markdownOnly && !s.promptOnly;
 
 const HIDE_FROM_LIST = [/^reg[ae]x\s*hide$/i, /^omega console/i, /^personnel create$/i, /^dossier$/i];
+const HSR_HIDE_FROM_LIST = /^(?:Trailblaze Dossier|Phone|Trailblaze Create)$/i;
 
 function listRegex() {
   const c = ctx();
@@ -2214,7 +2215,11 @@ async function setRegexEnabled(scope, key, enabled) {
 }
 
 function toggleList() {
-  return listRegex().filter((r) => !isHelper(r.s) && !HIDE_FROM_LIST.some((re) => re.test(String(r.s.scriptName || '').trim())));
+  return listRegex().filter(({ s }) => {
+    const name = String(s.scriptName || '').trim();
+    return !isHelper(s) && !HIDE_FROM_LIST.some(re => re.test(name)) &&
+      !(cur?.profile.id === 'hsr' && HSR_HIDE_FROM_LIST.test(name));
+  });
 }
 
 function applyBlock() {

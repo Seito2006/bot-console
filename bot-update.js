@@ -28,6 +28,13 @@ function hasCardContent(card, candidate) {
       typeof script.replaceString === 'string' && script.replaceString.includes(marker)));
 }
 
+function canRepairVersion(card, candidate) {
+  return candidate.folder === 'hsr' && compareVersion(card, candidate) < 0 &&
+    (trackedVersion(card) === candidate.version ||
+      (candidate.preserveCardFrom && visibleVersion(card) === candidate.preserveCardFrom)) &&
+    hasCardContent(card, candidate);
+}
+
 function pngCard(buffer) {
   const view = new DataView(buffer);
   if (view.byteLength < 20 || view.getUint32(0) !== 0x89504e47 || view.getUint32(4) !== 0x0d0a1a0a) {
@@ -69,6 +76,10 @@ async function bundledConfig() {
 
 const bundledUrl = (name, folder) => new URL(`./bots/${folder ? folder + '/' : ''}${encodeURIComponent(name)}`, import.meta.url);
 
+const obsoleteHsrPhoneRegex = script => /\bHSR_PHONE\b/i.test(script?.findRegex || '');
+const obsoleteHsrPhoneEntry = entry => /\bHSR_PHONE\b/i.test(entry?.content || '') &&
+  (entry.comment?.trim() === 'มือถือ' || /ASTRALLINK TERMINAL PROTOCOL/i.test(entry.content));
+
 function findLoreEntry(entries, comment) {
   return Object.keys(entries).find(key => {
     const entry = entries[key];
@@ -94,6 +105,7 @@ function loreEntryContent(existing, bundled, controls) {
 }
 
 function needsLoreRepair(existing, bundled, controls) {
+  if (Object.values(existing).some(obsoleteHsrPhoneEntry)) return true;
   return Object.values(bundled).some(entry => {
     const managed = controls.includes(entry.comment);
     if (!managed && entry.comment !== 'NPC List') return false;
@@ -103,7 +115,7 @@ function needsLoreRepair(existing, bundled, controls) {
 }
 
 function mergeLorebook(existing, bundled, controls) {
-  const entries = { ...existing.entries };
+  const entries = Object.fromEntries(Object.entries(existing.entries).filter(([, entry]) => !obsoleteHsrPhoneEntry(entry)));
   let nextId = Math.max(-1, ...Object.keys(entries).map(Number).filter(Number.isSafeInteger)) + 1;
   for (const [id, entry] of Object.entries(bundled.entries)) {
     const match = findLoreEntry(entries, entry.comment);
@@ -136,7 +148,7 @@ function missingLibraryTags(context, avatar, config) {
 function repairEmbeddedBook(current, bundled, controls) {
   const source = bundled.data.character_book;
   const book = current.data?.character_book;
-  const entries = Array.isArray(book?.entries) ? [...book.entries] : [];
+  const entries = Array.isArray(book?.entries) ? book.entries.filter(entry => !obsoleteHsrPhoneEntry(entry)) : [];
   let nextId = Math.max(-1, ...entries.map(entry => entry.id).filter(Number.isSafeInteger)) + 1;
   for (const entry of source.entries.filter(entry => controls.includes(entry.comment) || entry.comment === 'NPC List')) {
     const index = findLoreEntry(entries, entry.comment);
@@ -211,7 +223,7 @@ export function createBotUpdater(context, onChange, generating) {
     selectedOffer = offer;
     const book = offer.lorebookControls ? ' ระบบจะอัปเดตตัวควบคุมใน Lorebook และเก็บรายการอื่นไว้' :
       offer.lorebook ? ` ระบบจะบันทึกทับ Lorebook ชื่อ “${offer.lorebook.slice(0, -5)}”` : '';
-    message.textContent = !offer.repairVersion && (offer.repairLorebook || offer.repairTags || offer.repairEmbedded || offer.repairLibraryTags) ? `พร้อมอัปเดตข้อมูลเสริมของ ${offer.name}${book}` :
+    message.textContent = !offer.repairVersion && (offer.repairLorebook || offer.repairTags || offer.repairEmbedded || offer.repairLibraryTags || offer.repairRegex) ? `พร้อมอัปเดตข้อมูลเสริมของ ${offer.name}${book}` :
       `พร้อมอัปเดต ${offer.name} (${offer.avatar}) เป็นเวอร์ชัน ${offer.version} ประวัติแชทจะยังอยู่${book}`;
     dismiss.textContent = 'ไว้ทีหลัง';
     releaseLog.hidden = true;
@@ -303,8 +315,7 @@ export function createBotUpdater(context, onChange, generating) {
         if (!folder && !config.lorebookControls && installed(selected, config)) return {};
         const current = await getCard(avatar);
         if (nameKey(cardName(current)) !== nameKey(config.name)) return { detail: 'ชื่อการ์ดที่เลือกไม่ตรงกับชุดอัปเดต' };
-        const repairVersion = config.folder === 'hsr' && compareVersion(current, config) < 0 &&
-          trackedVersion(current) === config.version && hasCardContent(current, config);
+        const repairVersion = canRepairVersion(current, config);
         if (installed(current, config) || repairVersion) {
           if (config.lorebookControls && (repairVersion || compareVersion(current, config) === 0)) {
             const [book, bundled] = await Promise.all([
@@ -316,8 +327,10 @@ export function createBotUpdater(context, onChange, generating) {
             const repairLibraryTags = missingLibraryTags(context(), avatar, config).length > 0;
             const embedded = current.data?.character_book?.entries || [];
             const repairEmbedded = needsLoreRepair(embedded, bundled.entries, config.lorebookControls);
-            if (repairVersion || repairLorebook || repairTags || repairEmbedded || repairLibraryTags) {
-              return { offer: { ...config, avatar, repairVersion, repairLorebook, repairTags, repairEmbedded, repairLibraryTags } };
+            const scripts = current.data?.extensions?.regex_scripts;
+            const repairRegex = Array.isArray(scripts) && scripts.some(obsoleteHsrPhoneRegex);
+            if (repairVersion || repairLorebook || repairTags || repairEmbedded || repairLibraryTags || repairRegex) {
+              return { offer: { ...config, avatar, repairVersion, repairLorebook, repairTags, repairEmbedded, repairLibraryTags, repairRegex } };
             }
           }
           return { detail: compareVersion(current, config) > 0
@@ -378,7 +391,7 @@ export function createBotUpdater(context, onChange, generating) {
       if (current.avatar !== candidate.avatar || nameKey(cardName(current)) !== nameKey(candidate.name)) throw new Error('Character changed');
       if (compareVersion(current, candidate) > 0) throw new Error('Character version advanced after the update check');
       let saved = current;
-      const repairVersion = candidate.repairVersion && trackedVersion(current) === candidate.version && hasCardContent(current, candidate);
+      const repairVersion = candidate.repairVersion && canRepairVersion(current, candidate);
       if (!installed(current, candidate) && !repairVersion) {
         const filename = encodeURIComponent(candidate.file);
         const options = { cache: 'no-store', signal: AbortSignal.timeout(15000) };
@@ -398,10 +411,15 @@ export function createBotUpdater(context, onChange, generating) {
         saved = await saveCard(card, current, candidate, picture);
       } else {
         if (candidate.repairLorebook) await installLorebook(candidate);
-        if (repairVersion || candidate.repairEmbedded || (candidate.repairTags && missingTags(current, candidate).length)) {
-          const card = candidate.repairEmbedded
+        if (repairVersion || candidate.repairEmbedded || candidate.repairRegex || (candidate.repairTags && missingTags(current, candidate).length)) {
+          let card = candidate.repairEmbedded
             ? repairEmbeddedBook(current, await (await bundledFile(candidate.file, candidate.folder)).json(), candidate.lorebookControls)
             : current;
+          if (candidate.repairRegex && Array.isArray(card.data?.extensions?.regex_scripts)) {
+            const extensions = card.data.extensions;
+            const regex_scripts = extensions.regex_scripts.filter(script => !obsoleteHsrPhoneRegex(script));
+            card = { ...card, data: { ...card.data, extensions: { ...extensions, regex_scripts } } };
+          }
           saved = await saveCard(card, current, candidate);
         }
       }
